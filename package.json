@@ -1,0 +1,31 @@
+{
+  "name": "cpp-project-viewer",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "build:deps": "node scripts/build_deps.js",
+    "build:backend": "npm run build:deps && cmake -S . -B build && cmake --build build",
+    "build:frontend": "node scripts/build_frontend.js",
+    "build": "npm run build:frontend && npm run build:backend",
+    "test": "cmake -S . -B build -DCPJVIEW_ENABLE_TEST=on && cmake --build build && cd build/tests && ctest"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/react": "^18.2.67",
+    "@types/react-dom": "^18.2.22",
+    "esbuild": "^0.20.2",
+    "fs-extra": "^11.2.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.2"
+  },
+  "dependencies": {
+    "@antv/graphin": "^2.7.27",
+    "@antv/graphin-components": "^2.4.1",
+    "@antv/graphin-icons": "^1.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

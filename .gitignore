@@ -1,0 +1,9 @@
+/build
+/debug
+/release
+/node_modules
+/third_party/llvm-release
+/src/www/index.css
+/src/www/index.js
+
+.vscode
