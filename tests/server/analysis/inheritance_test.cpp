@@ -124,6 +124,29 @@ class B : A<int> {};
             {
                 .code = R"(
 template<class> class A {};
+using i32 = int;
+class B : A<i32> {};
+)",
+                .expects = {{.derived = "B", .base = "A<int>"}},
+            },
+            {
+                .code = R"(
+template<int> class A {};
+class B : A<12345> {};
+)",
+                .expects = {{.derived = "B", .base = "A<12345>"}},
+            },
+            {
+                .code = R"(
+template<class, class...> class A {};
+class B : A<int,long,unsigned> {};
+)",
+                .expects = {{.derived = "B",
+                             .base = "A<int, {long, unsigned int}>"}},
+            },
+            {
+                .code = R"(
+template<class> class A {};
 class B : A<void> {};
 class C : A<int> {};
 )",
@@ -145,4 +168,5 @@ class C : A<int>::B<int> {};
                         {.derived = "C", .base = "A<int>::B<int>"},
                     },
             },
+
         }));

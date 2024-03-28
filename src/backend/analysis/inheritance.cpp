@@ -4,66 +4,52 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/AST/TemplateName.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
+#include <__format/format_functions.h>
 
 namespace cpjview::analysis {
 
 namespace {
 
 std::string
-get_record_name(const clang::ClassTemplateSpecializationDecl *template_decl) {
-  // in template
-  std::string name = template_decl->getQualifiedNameAsString();
-  name += "<";
+get_template_name(llvm::ArrayRef<clang::TemplateArgument> const &args,
+                  clang::PrintingPolicy const &policy) {
   llvm::SmallVector<std::string> param_names{};
-  template_decl->getTemplateInstantiationArgs();
-  for (clang::TemplateArgument const &template_param :
-       template_decl->getTemplateInstantiationArgs().asArray()) {
-    switch (template_param.getKind()) {
-    case clang::TemplateArgument::Type:
-      param_names.push_back(template_param.getAsType().getAsString());
-      break;
-    case clang::TemplateArgument::Pack:
-      param_names.push_back("...");
-      break;
-    case clang::TemplateArgument::Null:
-    case clang::TemplateArgument::Declaration:
-    case clang::TemplateArgument::NullPtr:
-    case clang::TemplateArgument::Integral:
-    case clang::TemplateArgument::StructuralValue:
-    case clang::TemplateArgument::Template:
-    case clang::TemplateArgument::TemplateExpansion:
-    case clang::TemplateArgument::Expression:
-      param_names.push_back("unknown");
-      break;
+  for (clang::TemplateArgument const &template_param : args) {
+    if (template_param.getKind() == clang::TemplateArgument::ArgKind::Pack) {
+      param_names.push_back(std::format(
+          "{{{}}}",
+          get_template_name(template_param.getPackAsArray(), policy)));
+    } else {
+      std::string param_name{};
+      llvm::raw_string_ostream ss{param_name};
+      template_param.print(policy, ss, true);
+      param_names.push_back(param_name);
     }
   }
-  name += llvm::join(param_names, ",");
-  name += ">";
-  return name;
+  return llvm::join(param_names, ", ");
+}
+
+std::string get_specialization_name(
+    const clang::ClassTemplateSpecializationDecl *template_decl) {
+  return std::format(
+      "{}<{}>", template_decl->getQualifiedNameAsString(),
+      get_template_name(
+          template_decl->getTemplateInstantiationArgs().asArray(),
+          clang::PrintingPolicy{template_decl->getASTContext().getLangOpts()}));
 }
 
 std::string get_record_name(const clang::CXXRecordDecl *decl) {
   // in template
   if (const clang::ClassTemplateSpecializationDecl *template_decl =
           llvm::dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
-    return get_record_name(template_decl);
+    return get_specialization_name(template_decl);
   }
   return decl->getQualifiedNameAsString();
 }
-
-// std::string get_type_name(clang::QualType const &type) {
-//   const clang::CXXRecordDecl *record_decl =
-//       type->getUnqualifiedDesugaredType()->getAsCXXRecordDecl();
-//   if (const auto *specialization_decl =
-//           llvm::dyn_cast<clang::ClassTemplateSpecializationDecl>(record_decl))
-//           {
-//     return get_record_name(specialization_decl->getSpecializedTemplate());
-//   }
-//   return get_record_name(record_decl);
-// }
 
 class InheritanceVisitor
     : public clang::RecursiveASTVisitor<InheritanceVisitor> {
