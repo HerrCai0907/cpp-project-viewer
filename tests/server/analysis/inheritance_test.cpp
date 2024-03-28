@@ -41,6 +41,7 @@ struct InheritanceAnalysisTest : public ::testing::TestWithParam<TestParm> {
     std::vector<InheritancePair> ret =
         m_storage.get_inheritance_relationships();
     std::stringstream ss{};
+    ss << "\ncode:\n" << code << "\nresult:\n";
     for (InheritancePair const &pair : ret) {
       ss << pair.derived << " <- " << pair.base << "\n";
     }
@@ -95,31 +96,53 @@ class Out {
             {
                 .code = R"(
 class A {};
-template<class T> class B : A {};
+using Align = A;
+class B : Align {};
 )",
-                .expects = {{.derived = "B<B::T>", .base = "A"}},
+                .expects = {{.derived = "B", .base = "A"}},
             },
             {
                 .code = R"(
 class A {};
-template<class> class B : A {};
+template<class T> class B : A {};
+B<int> b1;
+B<char> b2;
 )",
-                .expects = {{.derived = "B<B::(anonymous)>", .base = "A"}},
+                .expects =
+                    {
+                        {.derived = "B<int>", .base = "A"},
+                        {.derived = "B<char>", .base = "A"},
+                    },
             },
             {
                 .code = R"(
 template<class> class A {};
 class B : A<int> {};
 )",
-                .expects = {{.derived = "B", .base = "A<A::(anonymous)>"}},
+                .expects = {{.derived = "B", .base = "A<int>"}},
             },
             {
                 .code = R"(
 template<class> class A {};
-template<> class A<void>{};
-class B : A<void> {};
+using i32 = int;
+class B : A<i32> {};
 )",
-                .expects = {{.derived = "B", .base = "A<A::(anonymous)>"}},
+                .expects = {{.derived = "B", .base = "A<int>"}},
+            },
+            {
+                .code = R"(
+template<int> class A {};
+class B : A<12345> {};
+)",
+                .expects = {{.derived = "B", .base = "A<12345>"}},
+            },
+            {
+                .code = R"(
+template<class, class...> class A {};
+class B : A<int,long,unsigned> {};
+)",
+                .expects = {{.derived = "B",
+                             .base = "A<int, {long, unsigned int}>"}},
             },
             {
                 .code = R"(
@@ -129,16 +152,21 @@ class C : A<int> {};
 )",
                 .expects =
                     {
-                        {.derived = "B", .base = "A<A::(anonymous)>"},
-                        {.derived = "C", .base = "A<A::(anonymous)>"},
+                        {.derived = "B", .base = "A<void>"},
+                        {.derived = "C", .base = "A<int>"},
                     },
             },
             {
                 .code = R"(
-class A {};
-using Align = A;
-class B : Align {};
+template<class> struct A {
+    template<class> struct B {};
+};
+class C : A<int>::B<int> {};
 )",
-                .expects = {{.derived = "B", .base = "A"}},
+                .expects =
+                    {
+                        {.derived = "C", .base = "A<int>::B<int>"},
+                    },
             },
+
         }));
