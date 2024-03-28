@@ -22,7 +22,7 @@ jobs:
           sudo ./llvm.sh 18
 
       - run: |
-          cmake -S . -B build -DCPJVIEW_ENABLE_TEST=on -DCPJVIEW_GLOBAL_LLVM=on -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          cmake -S . -B build -DCPJVIEW_ENABLE_TEST=on -DCPJVIEW_GLOBAL_LLVM=on -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DLLVM_DIR=/usr/lib/llvm-18/lib/cmake/llvm -DClang_DIR=/usr/lib/llvm-18/lib/cmake/clang
       - run: |
           cmake --build build
 
