@@ -1,0 +1,33 @@
+name: test
+
+on:
+  pull_request:
+    branches: ["main"]
+
+env:
+  version: 17.0.6
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: git submodule update --init --depth=1 third_party/httplib third_party/json third_party/spdlog
+
+      - name: install llvm and clang
+        run: |
+          wget https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ env.version }}/clang+llvm-${{ env.version }}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
+          tar -xvf clang+llvm-${{ env.version }}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
+          ls
+
+      - run: cmake -S . -B build -DCPJVIEW_ENABLE_TEST=on -DCPJVIEW_GLOBAL_LLVM=on -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+      - run: cmake --build build
+
+      - run: ctest --build-config ${{ matrix.build_type }}
+        working-directory: build

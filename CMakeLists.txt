@@ -2,17 +2,26 @@ cmake_minimum_required(VERSION 3.20.0)
 project(cpp-project-view)
 
 option(CPJVIEW_ENABLE_TEST "enable test" off)
+option(CPJVIEW_GLOBAL_LLVM "use llvm installed in global" off)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(LLVM REQUIRED PATHS ${PROJECT_SOURCE_DIR}/third_party/llvm-release NO_DEFAULT_PATH)
+if(CPJVIEW_GLOBAL_LLVM)
+  find_package(LLVM REQUIRED)
+else()
+  find_package(LLVM REQUIRED PATHS ${PROJECT_SOURCE_DIR}/third_party/llvm-release NO_DEFAULT_PATH)
+endif()
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
-find_package(CLANG REQUIRED PATHS ${PROJECT_SOURCE_DIR}/third_party/llvm-release NO_DEFAULT_PATH)
+if(CPJVIEW_GLOBAL_LLVM)
+  find_package(CLANG REQUIRED)
+else()
+  find_package(CLANG REQUIRED PATHS ${PROJECT_SOURCE_DIR}/third_party/llvm-release NO_DEFAULT_PATH)
+endif()
 
 message(STATUS "Found LLVM ${CLANG_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${CLANG_DIR}")
