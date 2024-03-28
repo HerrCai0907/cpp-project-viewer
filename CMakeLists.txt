@@ -18,13 +18,13 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 if(CPJVIEW_GLOBAL_LLVM)
-  find_package(CLANG REQUIRED)
+  find_package(Clang REQUIRED)
 else()
-  find_package(CLANG REQUIRED PATHS ${PROJECT_SOURCE_DIR}/third_party/llvm-release NO_DEFAULT_PATH)
+  find_package(Clang REQUIRED PATHS ${PROJECT_SOURCE_DIR}/third_party/llvm-release NO_DEFAULT_PATH)
 endif()
 
-message(STATUS "Found CLANG ${CLANG_PACKAGE_VERSION}")
-message(STATUS "Using CLANGConfig.cmake in: ${CLANG_DIR}")
+message(STATUS "Found Clang ${Clang_PACKAGE_VERSION}")
+message(STATUS "Using ClangGConfig.cmake in: ${Clang_DIR}")
 
 add_subdirectory(third_party)
 add_subdirectory(src)
