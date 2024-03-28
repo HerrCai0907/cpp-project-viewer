@@ -22,10 +22,9 @@ jobs:
       - name: install llvm and clang
         run: |
           wget https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ env.version }}/clang+llvm-${{ env.version }}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
-          tar -xvf clang+llvm-${{ env.version }}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
-          ls
+          tar -xf clang+llvm-${{ env.version }}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
 
-      - run: cmake -S . -B build -DCPJVIEW_ENABLE_TEST=on -DCPJVIEW_GLOBAL_LLVM=on -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+      - run: cmake -S . -B build -DCPJVIEW_ENABLE_TEST=on -DCPJVIEW_GLOBAL_LLVM=on -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DLLVM_DIR=clang+llvm-${{ env.version }}-x86_64-linux-gnu-ubuntu-22.04/lib/cmake/llvm -DCLANG_DIR=clang+llvm-${{ env.version }}-x86_64-linux-gnu-ubuntu-22.04/lib/cmake/clang/
 
       - run: cmake --build build
 

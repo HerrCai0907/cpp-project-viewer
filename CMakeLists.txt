@@ -23,8 +23,8 @@ else()
   find_package(CLANG REQUIRED PATHS ${PROJECT_SOURCE_DIR}/third_party/llvm-release NO_DEFAULT_PATH)
 endif()
 
-message(STATUS "Found LLVM ${CLANG_PACKAGE_VERSION}")
-message(STATUS "Using LLVMConfig.cmake in: ${CLANG_DIR}")
+message(STATUS "Found CLANG ${CLANG_PACKAGE_VERSION}")
+message(STATUS "Using CLANGConfig.cmake in: ${CLANG_DIR}")
 
 add_subdirectory(third_party)
 add_subdirectory(src)
