@@ -60,9 +60,15 @@ public:
   explicit InheritanceVisitor(Context const &context)
       : clang::RecursiveASTVisitor<InheritanceVisitor>{}, m_context(context) {}
 
-  bool TraverseDecl(clang::Decl *decl) {
+  bool TraverseNamespaceDecl(clang::NamespaceDecl *decl) {
     if (m_context.need_analysis(decl)) {
-      super::TraverseDecl(decl);
+      super::TraverseNamespaceDecl(decl);
+    }
+    return true;
+  }
+  bool TraverseCXXRecordDecl(clang::CXXRecordDecl *decl) {
+    if (m_context.need_analysis(decl)) {
+      super::TraverseCXXRecordDecl(decl);
     }
     return true;
   }

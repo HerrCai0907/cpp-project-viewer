@@ -4,6 +4,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include <cassert>
 #include <system_error>
 
 namespace cpjview::loader {
@@ -46,6 +47,7 @@ Filter::Filter(llvm::ArrayRef<std::string> include_paths)
 
 bool Filter::validate(std::string_view file_path,
                       std::string *normalized_file_path) const {
+  assert(!file_path.empty());
   auto normalize_path_result = normalize_path(file_path);
   if (normalize_path_result.nok()) {
     spdlog::error("ignore file {}, {}", file_path,
