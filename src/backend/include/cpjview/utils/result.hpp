@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cassert>
-#include <cstddef>
 #include <optional>
 #include <type_traits>
 #include <utility>
