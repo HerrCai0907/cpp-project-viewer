@@ -1,5 +1,6 @@
 #include "cpjview/utils/scheduler.hpp"
 #include "spdlog/spdlog.h"
+#include <atomic>
 #include <mutex>
 #include <thread>
 
@@ -57,8 +58,8 @@ void Task::update_finished_pre_count(std::size_t finished_count,
 Scheduler::ThreadWrapper::ThreadWrapper(Scheduler &scheduler)
     : m_thread{}, m_stop_flag{false} {
   m_thread = std::thread([this, &scheduler]() {
-    while (m_stop_flag) {
-      Task *task = scheduler.pop_ready_task();
+    while (!m_stop_flag) {
+      Task *task = scheduler.pop_ready_task(m_stop_flag);
       task->run(scheduler);
     }
   });
@@ -90,15 +91,20 @@ void Scheduler::mark_task_ready(Task *task) {
     std::lock_guard<std::mutex> lock{m_ready_tasks_mutex};
     m_ready_tasks.push(task);
   }
+  spdlog::trace("[scheduler] add ready task, current is {}",
+                m_ready_tasks.size());
   m_ready_tasks_cv.notify_one();
 }
 
-Task *Scheduler::pop_ready_task() {
+Task *Scheduler::pop_ready_task(std::atomic_bool const &force_stop_flag) {
   std::unique_lock<std::mutex> lock{m_ready_tasks_mutex};
-  m_ready_tasks_cv.wait(lock,
-                        [this]() -> bool { return !m_ready_tasks.empty(); });
+  m_ready_tasks_cv.wait(lock, [this, &force_stop_flag]() -> bool {
+    return force_stop_flag || !m_ready_tasks.empty();
+  });
   Task *task = m_ready_tasks.front();
   m_ready_tasks.pop();
+  spdlog::trace("[scheduler] consume task, current is {}",
+                m_ready_tasks.size());
   return task;
 }
 

@@ -72,7 +72,7 @@ public:
 
 private:
   void mark_task_ready(Task *task);
-  Task *pop_ready_task();
+  Task *pop_ready_task(std::atomic_bool const &force_stop_flag);
 };
 
 } // namespace cpjview
