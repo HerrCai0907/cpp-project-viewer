@@ -1,10 +1,12 @@
 #include "cpjview/loader/loader.hpp"
 #include "cpjview/loader/filter.hpp"
+#include "cpjview/utils/scheduler.hpp"
 #include "spdlog/spdlog.h"
-#include "clang/Tooling/CompilationDatabase.h"
+#include "clang/Frontend/ASTUnit.h"
 #include "clang/Tooling/JSONCompilationDatabase.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/ADT/StringRef.h"
+#include <memory>
 
 namespace cpjview::loader {
 
@@ -31,20 +33,36 @@ Loader::load(llvm::StringRef compilation_database_path, Filter const &filter) {
 }
 
 std::vector<std::unique_ptr<clang::ASTUnit>> Loader::create_ast() {
-  std::vector<std::unique_ptr<clang::ASTUnit>> asts{};
+  using ReturnType = std::vector<std::unique_ptr<clang::ASTUnit>>;
+  ReturnType asts{};
+  Scheduler scheduler{8u};
+  using Promise = TaskWithRet<ReturnType>;
+  std::vector<std::unique_ptr<Promise>> promises{};
   for (std::string const &file : m_target_files) {
-    spdlog::trace("generate ast for '{}'", file);
-    clang::tooling::ClangTool tool{*m_data_base, {file}};
-    switch (tool.buildASTs(asts)) {
-    case 0:
-      spdlog::debug("generate ast for '{} successfully'", file);
-      break;
-    case 1:
-      spdlog::error("generate ast for '{} failed'", file);
-      break;
-    case 2:
-      spdlog::warn("generate ast for '{} skipped'", file);
-      break;
+    promises.push_back(std::unique_ptr<Promise>{new Promise(
+        [this, file]() -> ReturnType {
+          spdlog::trace("generate ast for '{}'", file);
+          clang::tooling::ClangTool tool{*m_data_base, {file}};
+          ReturnType ast{};
+          switch (tool.buildASTs(ast)) {
+          case 0:
+            spdlog::debug("generate ast for '{} successfully'", file);
+            break;
+          case 1:
+            spdlog::error("generate ast for '{} failed'", file);
+            break;
+          case 2:
+            spdlog::warn("generate ast for '{} skipped'", file);
+            break;
+          }
+          return ast;
+        },
+        {}, scheduler)});
+  }
+  for (std::unique_ptr<Promise> const &promise : promises) {
+    ReturnType const &ret = promise->wait();
+    for (std::unique_ptr<clang::ASTUnit> &ast : promise->wait()) {
+      asts.push_back(std::move(ast));
     }
   }
   return asts;

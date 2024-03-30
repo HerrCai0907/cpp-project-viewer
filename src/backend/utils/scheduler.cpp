@@ -1,4 +1,6 @@
 #include "cpjview/utils/scheduler.hpp"
+#include "spdlog/spdlog.h"
+#include <mutex>
 #include <thread>
 
 namespace cpjview {
@@ -12,18 +14,24 @@ Task::Task(std::function<void()> fn, std::vector<Task *> const &pre_tasks,
       finished_pre++;
     }
   }
-  update_pre_count(finished_pre, scheduler);
+  update_finished_pre_count(finished_pre, scheduler);
+}
+
+void Task::wait() {
+  std::unique_lock<std::mutex> lock{m_mutex};
+  m_cv.wait(lock, [this] { return m_is_finished; });
 }
 
 void Task::run(Scheduler &scheduler) {
   m_fn();
   post_run(scheduler);
+  m_cv.notify_all();
 }
 
 void Task::post_run(Scheduler &scheduler) {
   std::lock_guard<std::mutex> lock{m_mutex};
   for (Task *post : m_post_tasks) {
-    post->update_pre_count(1, scheduler);
+    post->update_finished_pre_count(1, scheduler);
   }
   m_is_finished = true;
 }
@@ -36,7 +44,8 @@ bool Task::insert_post() {
   return false;
 }
 
-void Task::update_pre_count(std::size_t finished_count, Scheduler &scheduler) {
+void Task::update_finished_pre_count(std::size_t finished_count,
+                                     Scheduler &scheduler) {
   std::lock_guard<std::mutex> lock{m_mutex};
   m_finished_pre_cont += finished_count;
   if (m_finished_pre_cont == m_pre_count) {
@@ -65,6 +74,7 @@ Scheduler::~Scheduler() {
   for (ThreadWrapper *wrapper : m_thread_pool) {
     wrapper->m_stop_flag = true;
   }
+  m_ready_tasks_cv.notify_all();
   for (ThreadWrapper *wrapper : m_thread_pool) {
     if (wrapper->m_thread.joinable()) {
       wrapper->m_thread.join();
