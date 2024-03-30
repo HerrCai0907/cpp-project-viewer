@@ -59,8 +59,9 @@ Scheduler::ThreadWrapper::ThreadWrapper(Scheduler &scheduler)
     : m_thread{}, m_stop_flag{false} {
   m_thread = std::thread([this, &scheduler]() {
     while (!m_stop_flag) {
-      Task *task = scheduler.pop_ready_task(m_stop_flag);
-      task->run(scheduler);
+      if (Task *task = scheduler.pop_ready_task(m_stop_flag)) {
+        task->run(scheduler);
+      }
     }
   });
 }
@@ -98,9 +99,23 @@ void Scheduler::mark_task_ready(Task *task) {
 
 Task *Scheduler::pop_ready_task(std::atomic_bool const &force_stop_flag) {
   std::unique_lock<std::mutex> lock{m_ready_tasks_mutex};
-  m_ready_tasks_cv.wait(lock, [this, &force_stop_flag]() -> bool {
-    return force_stop_flag || !m_ready_tasks.empty();
+  enum ResumeReason { None, Stop, NewTask };
+  ResumeReason reason = ResumeReason::None;
+  m_ready_tasks_cv.wait(lock, [this, &force_stop_flag, &reason]() -> bool {
+    if (force_stop_flag) {
+      reason = ResumeReason::Stop;
+      return true;
+    }
+    if (!m_ready_tasks.empty()) {
+      reason = ResumeReason::NewTask;
+      return true;
+    }
+    return false;
   });
+  if (reason == ResumeReason::Stop) {
+    return nullptr;
+  }
+  assert(reason == ResumeReason::NewTask);
   Task *task = m_ready_tasks.front();
   m_ready_tasks.pop();
   spdlog::trace("[scheduler] consume task, current is {}",
