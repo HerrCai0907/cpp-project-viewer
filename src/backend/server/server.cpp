@@ -42,7 +42,7 @@ public:
       }
       spdlog::debug("success listening http://{}:{}", host, port);
     }
-    spdlog::info("backend server enabled");
+    spdlog::info("backend server enabled in http://{}:{}", host, port);
     return Result<void, Server::Error>::success();
   }
 
@@ -69,7 +69,7 @@ private:
     m_server.Get(
         "/api/dependence_graph",
         [this](const httplib::Request &, httplib::Response &response) noexcept {
-          spdlog::trace("process \"/api/dependence_graph\"");
+          spdlog::trace("[http] process \"/api/dependence_graph\"");
           std::vector<persistence::Storage::InheritancePair>
               inheritance_relationships =
                   m_storage.get_inheritance_relationships();
@@ -81,7 +81,7 @@ private:
             json["derived"] = relationship.derived;
             content.push_back(std::move(json));
           }
-          spdlog::trace("response {}", content.dump());
+          spdlog::trace("[http] response {}", content.dump());
           response.set_content(content.dump(), "application/json");
         });
   }

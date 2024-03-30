@@ -60,6 +60,7 @@ int main(int argc, const char *argv[]) {
     spdlog::error(load_ret.take_error());
     std::exit(1);
   }
+  spdlog::info("load compilation database successfully");
   std::vector<std::unique_ptr<clang::ASTUnit>> asts = loader.create_ast();
 
   for (std::unique_ptr<clang::ASTUnit> const &ast : asts) {
@@ -67,4 +68,5 @@ int main(int argc, const char *argv[]) {
         .m_ast_unit = ast.get(), .m_filter = &filter, .m_storage = &storage};
     analysis::InheritanceAnalysis{context}.start();
   }
+  spdlog::info("full analysis finished");
 }

@@ -93,7 +93,7 @@ private:
       return;
     }
     std::string name = get_record_name(decl);
-    spdlog::trace("find c++ record {}", name);
+    spdlog::trace("[inheritance] find c++ record {}", name);
     for (clang::CXXBaseSpecifier &base : decl->bases()) {
       std::string base_name =
           get_record_name(base.getType()->getAsCXXRecordDecl());

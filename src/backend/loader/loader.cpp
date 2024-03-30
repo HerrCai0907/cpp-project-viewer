@@ -41,7 +41,7 @@ std::vector<std::unique_ptr<clang::ASTUnit>> Loader::create_ast() {
   for (std::string const &file : m_target_files) {
     promises.push_back(std::unique_ptr<Promise>{new Promise(
         [this, file]() -> ReturnType {
-          spdlog::trace("generate ast for '{}'", file);
+          spdlog::trace("[loader] generate ast for '{}'", file);
           clang::tooling::ClangTool tool{*m_data_base, {file}};
           ReturnType ast{};
           switch (tool.buildASTs(ast)) {
