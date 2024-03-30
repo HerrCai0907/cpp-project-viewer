@@ -1,24 +1,10 @@
 #include "cpjview/loader/filter.hpp"
-#include "cpjview/utils/result.hpp"
+#include "cpjview/utils/file_system.hpp"
 #include "spdlog/spdlog.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
+#include "llvm/ADT/StringRef.h"
 #include <cassert>
-#include <system_error>
 
 namespace cpjview::loader {
-
-[[nodiscard]] static Result<std::string, std::error_code>
-normalize_path(llvm::StringRef path) {
-  llvm::SmallString<64> absolute_path{path};
-  if (std::error_code error = llvm::sys::fs::make_absolute(absolute_path)) {
-    return Result<std::string, std::error_code>::failed(error);
-  }
-  llvm::sys::path::remove_dots(absolute_path, true);
-  return Result<std::string, std::error_code>::success(
-      std::string{absolute_path});
-}
 
 [[nodiscard]] static bool
 is_file_included(std::string const &absolute_file_path,

@@ -1,5 +1,6 @@
 #include "cpjview/server/server.hpp"
 #include "cpjview/persistence/persistence.hpp"
+#include "cpjview/utils/file_system.hpp"
 #include "cpjview/utils/result.hpp"
 #include "spdlog/spdlog.h"
 #include <httplib.h>
@@ -56,7 +57,14 @@ private:
   }
 
   Result<void, Server::Error> mount(const std::string &mount_path) {
-    if (!m_server.set_mount_point("/", mount_path)) {
+    Result<std::string, std::error_code> absolute_mount_path =
+        normalize_path(mount_path);
+    if (absolute_mount_path.nok()) {
+      return Result<void, Server::Error>::failed(
+          Server::Error::cannot_mount_root_dir);
+    }
+    spdlog::trace("[http] mount {} to '/'", mount_path);
+    if (!m_server.set_mount_point("/", absolute_mount_path.get())) {
       return Result<void, Server::Error>::failed(
           Server::Error::cannot_mount_root_dir);
     }
