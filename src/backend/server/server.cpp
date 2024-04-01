@@ -1,5 +1,6 @@
 #include "cpjview/server/server.hpp"
 #include "cpjview/persistence/persistence.hpp"
+#include "cpjview/utils/file_system.hpp"
 #include "cpjview/utils/result.hpp"
 #include "spdlog/spdlog.h"
 #include <httplib.h>
@@ -42,7 +43,7 @@ public:
       }
       spdlog::debug("success listening http://{}:{}", host, port);
     }
-    spdlog::info("backend server enabled");
+    spdlog::info("backend server enabled in http://{}:{}", host, port);
     return Result<void, Server::Error>::success();
   }
 
@@ -56,7 +57,14 @@ private:
   }
 
   Result<void, Server::Error> mount(const std::string &mount_path) {
-    if (!m_server.set_mount_point("/", mount_path)) {
+    Result<std::string, std::error_code> absolute_mount_path =
+        normalize_path(mount_path);
+    if (absolute_mount_path.nok()) {
+      return Result<void, Server::Error>::failed(
+          Server::Error::cannot_mount_root_dir);
+    }
+    spdlog::trace("[http] mount {} to '/'", mount_path);
+    if (!m_server.set_mount_point("/", absolute_mount_path.get())) {
       return Result<void, Server::Error>::failed(
           Server::Error::cannot_mount_root_dir);
     }
@@ -69,7 +77,7 @@ private:
     m_server.Get(
         "/api/dependence_graph",
         [this](const httplib::Request &, httplib::Response &response) noexcept {
-          spdlog::trace("process \"/api/dependence_graph\"");
+          spdlog::trace("[http] process \"/api/dependence_graph\"");
           std::vector<persistence::Storage::InheritancePair>
               inheritance_relationships =
                   m_storage.get_inheritance_relationships();
@@ -81,7 +89,7 @@ private:
             json["derived"] = relationship.derived;
             content.push_back(std::move(json));
           }
-          spdlog::trace("response {}", content.dump());
+          spdlog::trace("[http] response {}", content.dump());
           response.set_content(content.dump(), "application/json");
         });
   }

@@ -1,5 +1,6 @@
+import pkg from "fs-extra";
+const { cpSync, existsSync, ensureDirSync } = pkg;
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { argv } from "node:process";
 
 const MainEntry = `third_party/llvm/llvm`;
@@ -17,4 +18,11 @@ if (!existsSync(InstallPath) || argv.includes("--force")) {
     Config
   );
   execSync(`cmake --build ${BuildFolder} --target install`, Config);
+}
+
+const BuiltinHeaderPath = "build/src/lib/clang";
+
+if (!existsSync(BuiltinHeaderPath) || argv.includes("--force")) {
+  ensureDirSync(BuiltinHeaderPath);
+  cpSync("third_party/llvm-release/lib/clang/", BuiltinHeaderPath, { recursive: true });
 }
