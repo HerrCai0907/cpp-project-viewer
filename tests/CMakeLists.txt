@@ -9,4 +9,4 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-add_subdirectory(server)
+add_subdirectory(client)

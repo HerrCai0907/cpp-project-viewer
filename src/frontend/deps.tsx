@@ -19,7 +19,7 @@ export default function deps() {
   const [deps, setDeps] = useState<GraphinData>({ nodes: [], edges: [] });
   useEffect(() => {
     (async () => {
-      const dependencies: { base: string; derived: string }[] = await (await fetch("api/dependence_graph")).json();
+      const dependencies: { base: string; derived: string }[] = await (await fetch("inheritance_graph")).json();
       let nodes = new Set<string>();
       let edges = new Array<IUserEdge>();
       for (let dep of dependencies) {
