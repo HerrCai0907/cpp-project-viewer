@@ -1,12 +1,11 @@
 #include "cpjview/server/http/http.hpp"
 #include "cpjview/common/result.hpp"
 #include "cpjview/protocol/inheritance.hpp"
-#include "cpjview/server/persistence/persistence.hpp"
-#include "nlohmann/json_fwd.hpp"
-#include "spdlog/spdlog.h"
+#include "cpjview/server/persistence/storage.hpp"
 #include <filesystem>
 #include <httplib.h>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 #include <thread>
 
 namespace cpjview::http {
@@ -69,7 +68,17 @@ private:
     return Result<void, Http::Error>::success();
   }
 
-  void register_apis() { register_inheritance(); }
+  void register_apis() {
+    register_project();
+    register_inheritance();
+  }
+
+  void register_project() {
+    m_server.Get("/api/v1/projects",
+                 [this](const httplib::Request &, httplib::Response &response) {
+                   response.set_content("", "application/json");
+                 });
+  }
 
   void register_inheritance() {
     m_server.Patch(
@@ -80,16 +89,14 @@ private:
           std::string const &project = request.path_params.at("project");
           protocol::Inheritance inheritance =
               protocol::Inheritance::from_json(request.body);
-          m_storage.add_inheritance_relationship(inheritance.m_derived,
-                                                 inheritance.m_base);
+          m_storage.add_inheritance(inheritance.m_derived, inheritance.m_base);
         });
     m_server.Get(
         "/inheritance_graph",
         [this](const httplib::Request &, httplib::Response &response) noexcept {
           spdlog::trace("[http] process \"/inheritance_graph\"");
           std::vector<persistence::Storage::InheritancePair>
-              inheritance_relationships =
-                  m_storage.get_inheritance_relationships();
+              inheritance_relationships = m_storage.get_all_inheritance();
           nlohmann::json content = nlohmann::json::array();
           for (persistence::Storage::InheritancePair const &relationship :
                inheritance_relationships) {

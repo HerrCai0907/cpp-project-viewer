@@ -1,6 +1,6 @@
 #include "cpjview/common/argparser.hpp"
 #include "cpjview/server/http/http.hpp"
-#include "cpjview/server/persistence/persistence.hpp"
+#include "cpjview/server/persistence/storage.hpp"
 #include <cstdint>
 #include <span>
 #include <spdlog/spdlog.h>
