@@ -17,7 +17,8 @@ void HttpSync::add_inheritance_relationship(std::string const &derived,
                                             std::string const &base) {
   spdlog::debug("add_inheritance_relationship");
 
-  const std::string uri = "/api/v1/projects/" + m_project_name + "/inheritance";
+  const std::string uri =
+      "/api/v1/projects/" + m_project_name + "/inheritances";
 
   const std::string body =
       protocol::Inheritance{.m_derived = derived, .m_base = base}.to_json();

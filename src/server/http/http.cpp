@@ -1,34 +1,45 @@
 #include "cpjview/server/http/http.hpp"
 #include "cpjview/common/result.hpp"
 #include "cpjview/protocol/inheritance.hpp"
+#include "cpjview/server/persistence/error_code.hpp"
 #include "cpjview/server/persistence/storage.hpp"
 #include <filesystem>
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include <sstream>
 #include <thread>
 
 namespace cpjview::http {
 
-class HttpImpl {
+static std::string to_string(const httplib::Request &req) {
+  std::stringstream ss{};
+  ss << req.method << " " << req.path;
+  if (!req.body.empty()) {
+    ss << " with body " << req.body;
+  }
+  return ss.str();
+}
+
+class HttpServerImpl {
   httplib::Server m_server;
   std::thread m_listen_thread;
   persistence::Storage &m_storage;
 
 public:
-  explicit HttpImpl(persistence::Storage &storage)
+  explicit HttpServerImpl(persistence::Storage &storage)
       : m_server(), m_listen_thread(), m_storage{storage} {}
 
-  ~HttpImpl() {
+  ~HttpServerImpl() {
     if (m_listen_thread.joinable()) {
       m_listen_thread.join();
     }
   }
 
-  Result<void, Http::Error> start(std::string const &resource,
-                                  std::string const &host, int port) {
+  Result<void, HttpServer::Error> start(std::string const &resource,
+                                        std::string const &host, int port) {
     {
-      Result<void, Http::Error> ret = mount(resource);
+      Result<void, HttpServer::Error> ret = mount(resource);
       if (ret.nok()) {
         spdlog::error("fail mounting {} to '/'", resource);
         return ret;
@@ -37,7 +48,7 @@ public:
     }
     register_apis();
     {
-      Result<void, Http::Error> ret = listen(host, port);
+      Result<void, HttpServer::Error> ret = listen(host, port);
       if (ret.nok()) {
         spdlog::error("fail listening {}:{}", host, port);
         return ret;
@@ -45,27 +56,28 @@ public:
       spdlog::debug("success listening http://{}:{}", host, port);
     }
     spdlog::info("backend server enabled in http://{}:{}", host, port);
-    return Result<void, Http::Error>::success();
+    return Result<void, HttpServer::Error>::success();
   }
 
 private:
-  Result<void, Http::Error> listen(const std::string &host, int port) {
+  Result<void, HttpServer::Error> listen(const std::string &host, int port) {
     if (!m_server.bind_to_port(host, port)) {
-      return Result<void, Http::Error>::failed(Http::Error::cannot_bind);
+      return Result<void, HttpServer::Error>::failed(
+          HttpServer::Error::cannot_bind);
     }
     m_listen_thread = std::thread([this]() { m_server.listen_after_bind(); });
-    return Result<void, Http::Error>::success();
+    return Result<void, HttpServer::Error>::success();
   }
 
-  Result<void, Http::Error> mount(const std::string &mount_path) {
+  Result<void, HttpServer::Error> mount(const std::string &mount_path) {
     std::filesystem::path absolute_mount_path =
         std::filesystem::absolute(mount_path);
     spdlog::trace("[http] mount {} to '/'", mount_path);
     if (!m_server.set_mount_point("/", absolute_mount_path.string())) {
-      return Result<void, Http::Error>::failed(
-          Http::Error::cannot_mount_root_dir);
+      return Result<void, HttpServer::Error>::failed(
+          HttpServer::Error::cannot_mount_root_dir);
     }
-    return Result<void, Http::Error>::success();
+    return Result<void, HttpServer::Error>::success();
   }
 
   void register_apis() {
@@ -82,50 +94,61 @@ private:
 
   void register_inheritance() {
     m_server.Patch(
-        "/api/v1/projects/:project/inheritance",
+        "/api/v1/projects/:project/inheritances",
         [this](const httplib::Request &request, httplib::Response &response) {
-          spdlog::trace("[http] process path {} with body {}", request.path,
-                        request.body);
+          spdlog::trace("[http] recv {}", to_string(request));
           std::string const &project = request.path_params.at("project");
           protocol::Inheritance inheritance =
               protocol::Inheritance::from_json(request.body);
-          m_storage.add_inheritance(inheritance.m_derived, inheritance.m_base);
+          m_storage.add_inheritance(project, inheritance.m_derived,
+                                    inheritance.m_base);
         });
     m_server.Get(
-        "/inheritance_graph",
-        [this](const httplib::Request &, httplib::Response &response) noexcept {
-          spdlog::trace("[http] process \"/inheritance_graph\"");
-          std::vector<persistence::Storage::InheritancePair>
-              inheritance_relationships = m_storage.get_all_inheritance();
-          nlohmann::json content = nlohmann::json::array();
+        "/api/v1/projects/:project/inheritances",
+        [this](const httplib::Request &request, httplib::Response &response) {
+          spdlog::trace("[http] recv {}", to_string(request));
+          std::string const &project = request.path_params.at("project");
+          Result<std::vector<persistence::Storage::InheritancePair>,
+                 persistence::ErrorCode>
+              inheritances = m_storage.get_all_inheritance(project);
+          if (inheritances.nok()) {
+            response.status =
+                static_cast<int>(inheritances.take_error().m_code);
+            return;
+          }
+          nlohmann::json content_json = nlohmann::json::array();
           for (persistence::Storage::InheritancePair const &relationship :
-               inheritance_relationships) {
+               inheritances.get()) {
             const nlohmann::json json = {
                 {"base", relationship.base},
                 {"derived", relationship.derived},
             };
-            content.push_back(std::move(json));
+            content_json.push_back(std::move(json));
           }
-          spdlog::trace("[http] response {}", content.dump());
-          response.set_content(content.dump(), "application/json");
+          const std::string content = content_json.dump();
+          spdlog::trace("[http] response {}", content);
+          response.set_content(content, "application/json");
         });
   }
 };
 
-Http::Http(persistence::Storage &storage) { m_impl = new HttpImpl(storage); }
+HttpServer::HttpServer(persistence::Storage &storage) {
+  m_impl = new HttpServerImpl(storage);
+}
 
-Http::~Http() { delete m_impl; }
+HttpServer::~HttpServer() { delete m_impl; }
 
-Result<void, Http::Error> Http::start(std::string const &resource,
-                                      std::string const &host, int port) {
+Result<void, HttpServer::Error> HttpServer::start(std::string const &resource,
+                                                  std::string const &host,
+                                                  int port) {
   return m_impl->start(resource, host, port);
 }
 
-std::string to_string(Http::Error err) {
+std::string to_string(HttpServer::Error err) {
   switch (err) {
-  case Http::Error::cannot_mount_root_dir:
+  case HttpServer::Error::cannot_mount_root_dir:
     return "cannot mount resource folder";
-  case Http::Error::cannot_bind:
+  case HttpServer::Error::cannot_bind:
     return "cannot bind to port";
   }
   return "unknown";

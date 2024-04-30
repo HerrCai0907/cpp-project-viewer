@@ -34,8 +34,8 @@ int main(int argc, const char *argv[]) {
 
   persistence::Storage storage{};
 
-  http::Http http_server{storage};
-  Result<void, http::Http::Error> ret =
+  http::HttpServer http_server{storage};
+  Result<void, http::HttpServer::Error> ret =
       http_server.start("src/www", "127.0.0.1", 8000);
   if (ret.nok()) {
     spdlog::error(http::to_string(ret.take_error()));

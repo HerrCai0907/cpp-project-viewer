@@ -4,9 +4,9 @@ import Deps from "./deps";
 export default function app() {
   return (
     <div>
-      <h1>Project Name</h1>
+      <h2>dependence map</h2>
       <div>
-        <h2>dependence map</h2>
+        <h1>Project Name</h1>
         <Deps></Deps>
       </div>
     </div>
