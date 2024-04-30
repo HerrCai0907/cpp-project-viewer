@@ -8,12 +8,12 @@ namespace cpjview::persistence {
 namespace {} // namespace
 
 void Inheritance::add_inheritance(const char *derived, const char *base) {
-  auto getRelationship = [this](const char *str) -> Index & {
+  auto getRelationship = [this](const char *str) -> Element & {
     Map::iterator derived_it = m_inheritance.find(str);
     if (derived_it != m_inheritance.end()) {
       return derived_it->second;
     }
-    return m_inheritance.insert_or_assign(str, Index{}).first->second;
+    return m_inheritance.insert_or_assign(str, Element{}).first->second;
   };
   getRelationship(base).m_derived.insert(derived);
   getRelationship(derived).m_base.insert(base);

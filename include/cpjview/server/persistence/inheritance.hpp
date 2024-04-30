@@ -8,12 +8,11 @@
 namespace cpjview::persistence {
 
 class Inheritance {
-  struct Index {
+  struct Element {
     std::set<const char *> m_derived{};
     std::set<const char *> m_base{};
   };
-
-  using Map = std::map<const char *, Index>;
+  using Map = std::map<const char *, Element>;
   Map m_inheritance{};
 
 public:
