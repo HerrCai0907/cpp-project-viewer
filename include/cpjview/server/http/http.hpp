@@ -1,13 +1,13 @@
 
 #include "cpjview/common/result.hpp"
-#include "cpjview/server/persistence/persistence.hpp"
+#include "cpjview/server/persistence/storage.hpp"
 
 namespace cpjview::http {
 
-class HttpImpl;
+class HttpServerImpl;
 
-class Http {
-  HttpImpl *m_impl;
+class HttpServer {
+  HttpServerImpl *m_impl;
 
 public:
   enum class Error {
@@ -15,13 +15,13 @@ public:
     cannot_bind,
   };
 
-  explicit Http(persistence::Storage &storage);
-  ~Http();
+  explicit HttpServer(persistence::Storage &storage);
+  ~HttpServer();
 
   Result<void, Error> start(std::string const &resource,
                             std::string const &host, int port);
 };
 
-std::string to_string(Http::Error err);
+std::string to_string(HttpServer::Error err);
 
 } // namespace cpjview::http
