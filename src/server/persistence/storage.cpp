@@ -47,10 +47,11 @@ std::vector<const char *> Storage::get_projects() const {
 void Storage::add_inheritance(std::string const &project_name,
                               std::string const &derived,
                               std::string const &base) {
+  const char *project_name_c_str = m_impl->ensure_string_in_cache(project_name);
   const char *base_c_str = m_impl->ensure_string_in_cache(base);
   const char *derived_c_str = m_impl->ensure_string_in_cache(derived);
   m_impl->m_projects.modify_info(
-      project_name.c_str(),
+      project_name_c_str,
       [base_c_str, derived_c_str](Project::Info &info) -> ErrorCodeResult {
         info.m_inheritance.add_inheritance(derived_c_str, base_c_str);
         return ErrorCodeResult::success();
@@ -60,7 +61,8 @@ void Storage::add_inheritance(std::string const &project_name,
 Result<std::vector<Storage::InheritancePair>, ErrorCode>
 Storage::get_all_inheritance(std::string const &project_name) const {
   using RetType = Result<std::vector<Storage::InheritancePair>, ErrorCode>;
-  Project::Info *info = m_impl->m_projects.get_info(project_name.c_str());
+  const char *project_name_c_str = m_impl->ensure_string_in_cache(project_name);
+  Project::Info *info = m_impl->m_projects.get_info(project_name_c_str);
   if (info == nullptr) {
     return RetType::failed(ErrorCode::not_found());
   }

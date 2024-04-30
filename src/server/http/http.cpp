@@ -3,6 +3,7 @@
 #include "cpjview/protocol/inheritance.hpp"
 #include "cpjview/server/persistence/error_code.hpp"
 #include "cpjview/server/persistence/storage.hpp"
+#include "nlohmann/json_fwd.hpp"
 #include <filesystem>
 #include <httplib.h>
 #include <nlohmann/json.hpp>
@@ -86,49 +87,56 @@ private:
   }
 
   void register_project() {
-    m_server.Get("/api/v1/projects",
-                 [this](const httplib::Request &, httplib::Response &response) {
-                   response.set_content("", "application/json");
-                 });
+    m_server.Get("/api/v1/projects", [this](const httplib::Request &,
+                                            httplib::Response &response) {
+      std::vector<const char *> project_list = m_storage.get_projects();
+      nlohmann::json content_json = nlohmann::json::array();
+      for (const char *project_name : project_list) {
+        content_json.push_back(nlohmann::json{
+            {"name", std::string{project_name}},
+        });
+      }
+      const std::string content = content_json.dump();
+      spdlog::trace("[http] response {}", content);
+      response.set_content(content, "application/json");
+    });
   }
 
   void register_inheritance() {
-    m_server.Patch(
-        "/api/v1/projects/:project/inheritances",
-        [this](const httplib::Request &request, httplib::Response &response) {
-          spdlog::trace("[http] recv {}", to_string(request));
-          std::string const &project = request.path_params.at("project");
-          protocol::Inheritance inheritance =
-              protocol::Inheritance::from_json(request.body);
-          m_storage.add_inheritance(project, inheritance.m_derived,
-                                    inheritance.m_base);
+    constexpr const char *path_pattern =
+        "/api/v1/projects/:project/inheritances";
+    m_server.Patch(path_pattern, [this](const httplib::Request &request,
+                                        httplib::Response &response) {
+      spdlog::trace("[http] recv {}", to_string(request));
+      std::string const &project = request.path_params.at("project");
+      protocol::Inheritance inheritance =
+          protocol::Inheritance::from_json(request.body);
+      m_storage.add_inheritance(project, inheritance.m_derived,
+                                inheritance.m_base);
+    });
+    m_server.Get(path_pattern, [this](const httplib::Request &request,
+                                      httplib::Response &response) {
+      spdlog::trace("[http] recv {}", to_string(request));
+      std::string const &project = request.path_params.at("project");
+      Result<std::vector<persistence::Storage::InheritancePair>,
+             persistence::ErrorCode>
+          inheritances = m_storage.get_all_inheritance(project);
+      if (inheritances.nok()) {
+        response.status = static_cast<int>(inheritances.take_error().m_code);
+        return;
+      }
+      nlohmann::json content_json = nlohmann::json::array();
+      for (persistence::Storage::InheritancePair const &relationship :
+           inheritances.get()) {
+        content_json.push_back(nlohmann::json{
+            {"base", relationship.base},
+            {"derived", relationship.derived},
         });
-    m_server.Get(
-        "/api/v1/projects/:project/inheritances",
-        [this](const httplib::Request &request, httplib::Response &response) {
-          spdlog::trace("[http] recv {}", to_string(request));
-          std::string const &project = request.path_params.at("project");
-          Result<std::vector<persistence::Storage::InheritancePair>,
-                 persistence::ErrorCode>
-              inheritances = m_storage.get_all_inheritance(project);
-          if (inheritances.nok()) {
-            response.status =
-                static_cast<int>(inheritances.take_error().m_code);
-            return;
-          }
-          nlohmann::json content_json = nlohmann::json::array();
-          for (persistence::Storage::InheritancePair const &relationship :
-               inheritances.get()) {
-            const nlohmann::json json = {
-                {"base", relationship.base},
-                {"derived", relationship.derived},
-            };
-            content_json.push_back(std::move(json));
-          }
-          const std::string content = content_json.dump();
-          spdlog::trace("[http] response {}", content);
-          response.set_content(content, "application/json");
-        });
+      }
+      const std::string content = content_json.dump();
+      spdlog::trace("[http] response {}", content);
+      response.set_content(content, "application/json");
+    });
   }
 };
 
