@@ -70,7 +70,7 @@ class Scheduler {
 
   class ReadyQueue;
   std::unique_ptr<ReadyQueue> m_ready_queue;
-  std::vector<ThreadWrapper *> m_thread_pool{};
+  std::vector<std::unique_ptr<ThreadWrapper>> m_thread_pool{};
 
 public:
   Scheduler(std::size_t executor_count);
