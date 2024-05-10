@@ -32,9 +32,11 @@ public:
        std::vector<Task *> const &pre_tasks, Scheduler &scheduler)
       : m_id{get_task_id()}, m_priority(priority), m_fn{std::move(fn)},
         m_pre_count{pre_tasks.size()} {
+    spdlog::trace("[scheduler] create task {} with pre-task size {}", m_id,
+                  m_pre_count);
     std::size_t finished_pre = 0;
     for (Task *pre : pre_tasks) {
-      if (!pre->m_impl->insert_post()) {
+      if (!pre->m_impl->insert_post(this)) {
         finished_pre++;
       }
     }
@@ -58,10 +60,10 @@ private:
     }
     m_is_finished = true;
   }
-  bool insert_post() {
+  bool insert_post(Impl *post_task) {
     std::lock_guard<std::mutex> lock{m_mutex};
     if (!m_is_finished) {
-      m_post_tasks.push_back(this);
+      m_post_tasks.push_back(post_task);
       return true;
     }
     return false;
@@ -71,7 +73,6 @@ private:
     std::lock_guard<std::mutex> lock{m_mutex};
     m_finished_pre_cont += finished_count;
     if (m_finished_pre_cont == m_pre_count) {
-      m_is_finished = false;
       scheduler.mark_task_ready(this);
     }
   }
@@ -177,14 +178,16 @@ Scheduler::~Scheduler() {
 
 void Scheduler::mark_task_ready(Task::Impl *task) {
   m_ready_queue->push(task);
-  spdlog::trace("[scheduler] add ready task {}, current is {}", task->m_id,
+  spdlog::trace("[scheduler] add ready task {}, current size is {}", task->m_id,
                 m_ready_queue->size());
 }
 
 Task::Impl *Scheduler::pop_ready_task(std::atomic_bool const &force_stop_flag) {
   Task::Impl *task = m_ready_queue->pop(force_stop_flag);
-  spdlog::trace("[scheduler] consume task {}, current is {}", task->m_id,
-                m_ready_queue->size());
+  if (task != nullptr) {
+    spdlog::trace("[scheduler] consume task {}, current size is {}", task->m_id,
+                  m_ready_queue->size());
+  }
   return task;
 }
 
