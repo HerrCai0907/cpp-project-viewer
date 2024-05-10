@@ -1,46 +1,88 @@
-import React, { useEffect, useState } from "react";
-import Graphin, { GraphinData, IUserEdge, IUserNode } from "@antv/graphin";
+import React, { useState } from "react";
+import { Tree, TreeDataNode } from "antd";
 
-function createNode(name: string): IUserNode {
-  return {
-    id: name,
-    style: {
-      keyshape: { size: 10, stroke: "#FF6A00", fill: "#FF6A00", fillOpacity: 0.2, strokeOpacity: 1 },
-      label: { value: name, position: "top", fill: "#6DD400" },
-    },
-  };
+type P = { project: string | null };
+type S = {
+  treeData: TreeDataNode[];
+  project: string | null;
+};
+
+class CppClass {
+  constructor(public name: string) {}
+  isFirstBase: boolean = true;
+  derivedClasses: CppClass[] = [];
+
+  toTreeNode(): TreeDataNode {
+    const key = this.name;
+    return {
+      key,
+      title: this.name,
+      children: this.derivedClasses.map((c) => c._toTreeNode(key)),
+    };
+  }
+
+  _toTreeNode(parent_key: string): TreeDataNode {
+    const key = `${parent_key}-${this.name}`;
+    return {
+      key,
+      title: this.name,
+      children: this.derivedClasses.map((c) => c._toTreeNode(key)),
+    };
+  }
 }
 
-function createEdge(source: string, target: string): IUserEdge {
-  return { source, target };
+function createCppClasses(dependencies: { base: string; derived: string }[]) {
+  let classMapping = new Map<string, CppClass>();
+  for (const { base, derived } of dependencies) {
+    let baseClass = classMapping.get(base) ?? new CppClass(base);
+    classMapping.set(base, baseClass);
+
+    let derivedClass = classMapping.get(derived) ?? new CppClass(derived);
+    classMapping.set(derived, derivedClass);
+
+    baseClass.derivedClasses.push(derivedClass);
+    derivedClass.isFirstBase = false;
+  }
+  return classMapping;
 }
 
-function update(project: string | null, setDeps: React.Dispatch<React.SetStateAction<GraphinData>>) {
-  (async () => {
-    if (project == null) {
+const Deps: React.FC<P> = (prop) => {
+  const [status, setStatus] = useState<S>({
+    treeData: [],
+    project: null,
+  });
+
+  async function update() {
+    if (prop.project == status.project) {
       return;
     }
     const dependencies: { base: string; derived: string }[] = await (
-      await fetch(`/api/v1/projects/${project}/inheritances`)
+      await fetch(`/api/v1/projects/${prop.project}/inheritances`)
     ).json();
-    let nodes = new Set<string>();
-    let edges = new Array<IUserEdge>();
-    for (let dep of dependencies) {
-      nodes.add(dep.base);
-      nodes.add(dep.derived);
-      edges.push(createEdge(dep.derived, dep.base));
-    }
-    setDeps({ nodes: Array.from(nodes).map((n) => createNode(n)), edges });
-  })();
-}
 
-export default function deps(prop: { project: string | null }) {
-  const [deps, setDeps] = useState<GraphinData>({ nodes: [], edges: [] });
-  update(prop.project, setDeps);
+    const classes = createCppClasses(dependencies);
+    let treeData: TreeDataNode[] = [];
+    for (let [_, info] of classes) {
+      if (info.isFirstBase) {
+        treeData.push(info.toTreeNode());
+      }
+    }
+
+    setStatus({
+      project: prop.project,
+      treeData: treeData,
+    });
+  }
+  update();
 
   if (prop.project == null) {
     return <div></div>;
-  } else {
-    return <Graphin data={deps} style={{ background: "#363b40" }} />;
   }
-}
+  return (
+    <div>
+      <Tree showLine={true} showIcon={false} treeData={status.treeData} />
+    </div>
+  );
+};
+
+export default Deps;
