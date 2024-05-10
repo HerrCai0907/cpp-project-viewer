@@ -14,97 +14,66 @@ static std::size_t get_task_id() {
   return id++;
 }
 
-class Task::Impl {
-  friend Scheduler;
-
-  std::size_t m_id{};
-  std::uint8_t m_priority;
-  std::function<void()> m_fn;
-  std::size_t m_pre_count;
-  std::size_t m_finished_pre_cont{0u};
-  bool m_is_finished{false};
-  std::vector<Impl *> m_post_tasks{};
-  std::mutex m_mutex{}; // lock order should be from pre to post
-  std::condition_variable m_cv{};
-
-public:
-  Impl(std::uint8_t priority, std::function<void()> fn,
-       std::vector<Task *> const &pre_tasks, Scheduler &scheduler)
-      : m_id{get_task_id()}, m_priority(priority), m_fn{std::move(fn)},
-        m_pre_count{pre_tasks.size()} {
-    spdlog::trace("[scheduler] create task {} with pre-task size {}", m_id,
-                  m_pre_count);
-    std::size_t finished_pre = 0;
-    for (Task *pre : pre_tasks) {
-      if (!pre->m_impl->insert_post(this)) {
-        finished_pre++;
-      }
-    }
-    update_finished_pre_count(finished_pre, scheduler);
-  }
-  void wait() {
-    std::unique_lock<std::mutex> lock{m_mutex};
-    m_cv.wait(lock, [this] { return m_is_finished; });
-  }
-
-private:
-  void run(Scheduler &scheduler) {
-    m_fn();
-    post_run(scheduler);
-    m_cv.notify_all();
-  }
-  void post_run(Scheduler &scheduler) {
-    std::lock_guard<std::mutex> lock{m_mutex};
-    for (Impl *post : m_post_tasks) {
-      post->update_finished_pre_count(1, scheduler);
-    }
-    m_is_finished = true;
-  }
-  bool insert_post(Impl *post_task) {
-    std::lock_guard<std::mutex> lock{m_mutex};
-    if (!m_is_finished) {
-      m_post_tasks.push_back(post_task);
-      return true;
-    }
-    return false;
-  }
-  void update_finished_pre_count(std::size_t finished_count,
-                                 Scheduler &scheduler) {
-    std::lock_guard<std::mutex> lock{m_mutex};
-    m_finished_pre_cont += finished_count;
-    if (m_finished_pre_cont == m_pre_count) {
-      scheduler.mark_task_ready(this);
-    }
-  }
-};
-
 Task::Task(std::uint8_t priority, std::function<void()> fn,
            std::vector<Task *> const &pre_tasks, Scheduler &scheduler)
-    : m_impl(new Impl(priority, std::move(fn), pre_tasks, scheduler)) {}
+    : m_id{get_task_id()}, m_priority(priority), m_fn{std::move(fn)},
+      m_pre_count{pre_tasks.size()} {
+  spdlog::trace("[scheduler] create task {} with pre-task size {}", m_id,
+                m_pre_count);
+  std::size_t finished_pre = 0;
+  for (Task *pre : pre_tasks) {
+    if (!pre->insert_post(this)) {
+      finished_pre++;
+    }
+  }
+  update_finished_pre_count(finished_pre, scheduler);
+}
+void Task::wait() {
+  std::unique_lock<std::mutex> lock{m_mutex};
+  m_cv.wait(lock, [this] { return m_is_finished; });
+}
 
-Task::Task(Task &&other) = default;
-
-Task &Task::operator=(Task &&other) = default;
-
-Task::~Task() = default;
-
-void Task::wait() { m_impl->wait(); }
+void Task::run(Scheduler &scheduler) {
+  m_fn();
+  post_run(scheduler);
+  m_cv.notify_all();
+}
+void Task::post_run(Scheduler &scheduler) {
+  std::lock_guard<std::mutex> lock{m_mutex};
+  for (Task *post : m_post_tasks) {
+    post->update_finished_pre_count(1, scheduler);
+  }
+  m_is_finished = true;
+}
+bool Task::insert_post(Task *post_task) {
+  std::lock_guard<std::mutex> lock{m_mutex};
+  if (!m_is_finished) {
+    m_post_tasks.push_back(post_task);
+    return true;
+  }
+  return false;
+}
+void Task::update_finished_pre_count(std::size_t finished_count,
+                                     Scheduler &scheduler) {
+  std::lock_guard<std::mutex> lock{m_mutex};
+  m_finished_pre_cont += finished_count;
+  if (m_finished_pre_cont == m_pre_count) {
+    scheduler.mark_task_ready(this);
+  }
+}
 
 class Scheduler::ReadyQueue {
   struct CompareTask {
-    bool operator()(Task::Impl *a, Task::Impl *b) {
-      return a->m_priority < b->m_priority;
-    }
+    bool operator()(Task *a, Task *b) { return a->m_priority < b->m_priority; }
   };
 
-  std::priority_queue<Task::Impl *, std::vector<cpjview::Task::Impl *>,
-                      CompareTask>
+  std::priority_queue<Task *, std::vector<cpjview::Task *>, CompareTask>
       m_queue{};
   std::mutex m_mutex{};
   std::condition_variable m_cv{};
 
 public:
-  void push(Task::Impl *task) {
+  void push(Task *task) {
     {
       std::lock_guard<std::mutex> lock{m_mutex};
       m_queue.push(task);
@@ -114,7 +83,7 @@ public:
   size_t size() const { return m_queue.size(); }
   bool empty() const { return m_queue.empty(); }
 
-  Task::Impl *pop(std::atomic_bool const &force_stop_flag) {
+  Task *pop(std::atomic_bool const &force_stop_flag) {
     enum ResumeReason { None, Stop, NewTask };
     ResumeReason reason = ResumeReason::None;
     std::unique_lock<std::mutex> lock{m_mutex};
@@ -134,7 +103,7 @@ public:
       return nullptr;
     }
     assert(reason == ResumeReason::NewTask);
-    Task::Impl *top = m_queue.top();
+    Task *top = m_queue.top();
     m_queue.pop();
     return top;
   }
@@ -146,7 +115,7 @@ Scheduler::ThreadWrapper::ThreadWrapper(Scheduler &scheduler)
     : m_thread{}, m_stop_flag{false} {
   m_thread = std::thread([this, &scheduler]() {
     while (!m_stop_flag) {
-      Task::Impl *task = scheduler.pop_ready_task(m_stop_flag);
+      Task *task = scheduler.pop_ready_task(m_stop_flag);
       if (task != nullptr) {
         task->run(scheduler);
       }
@@ -176,14 +145,14 @@ Scheduler::~Scheduler() {
   }
 }
 
-void Scheduler::mark_task_ready(Task::Impl *task) {
+void Scheduler::mark_task_ready(Task *task) {
   m_ready_queue->push(task);
   spdlog::trace("[scheduler] add ready task {}, current size is {}", task->m_id,
                 m_ready_queue->size());
 }
 
-Task::Impl *Scheduler::pop_ready_task(std::atomic_bool const &force_stop_flag) {
-  Task::Impl *task = m_ready_queue->pop(force_stop_flag);
+Task *Scheduler::pop_ready_task(std::atomic_bool const &force_stop_flag) {
+  Task *task = m_ready_queue->pop(force_stop_flag);
   if (task != nullptr) {
     spdlog::trace("[scheduler] consume task {}, current size is {}", task->m_id,
                   m_ready_queue->size());

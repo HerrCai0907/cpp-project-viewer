@@ -76,20 +76,21 @@ int main(int argc, const char *argv[]) {
   std::vector<Promise<void>> analysis_promises{};
   for (Promise<loader::Loader::AstUnits> &promise : create_ast_promises) {
     auto fn = [&promise, &filter, &storage]() -> void {
-      loader::Loader::AstUnits &ast_units = promise.wait();
+      loader::Loader::AstUnits &ast_units = promise->wait();
       for (std::unique_ptr<clang::ASTUnit> &ast : ast_units) {
         analysis::Context context{.m_ast_unit = ast.get(),
                                   .m_filter = &filter,
                                   .m_storage = &storage};
         analysis::InheritanceAnalysis{context}.start();
+        ast.reset();
       }
     };
-    analysis_promises.push_back(
-        Promise<void>{AnalyzingPriority, fn, {&promise.get_task()}, scheduler});
+    analysis_promises.push_back(Promise<void>{
+        new Task(AnalyzingPriority, fn, {&promise->get_task()}, scheduler)});
   }
 
   for (Promise<void> &promise : analysis_promises) {
-    promise.wait();
+    promise->wait();
   }
   spdlog::info("full analysis finished");
 }
