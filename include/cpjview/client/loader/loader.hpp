@@ -2,6 +2,7 @@
 
 #include "cpjview/client/loader/filter.hpp"
 #include "cpjview/common/result.hpp"
+#include "cpjview/common/scheduler.hpp"
 #include "clang/Frontend/ASTUnit.h"
 #include "clang/Tooling/JSONCompilationDatabase.h"
 #include "llvm/ADT/StringRef.h"
@@ -13,7 +14,8 @@ public:
   Result<void, std::string> load(llvm::StringRef compilation_database_path,
                                  Filter const &filter);
 
-  std::vector<std::unique_ptr<clang::ASTUnit>> create_ast();
+  using AstUnits = std::vector<std::unique_ptr<clang::ASTUnit>>;
+  std::vector<Promise<AstUnits>> create_ast(Scheduler &scheduler);
 
 private:
   using JSONCompilationDatabase = clang::tooling::JSONCompilationDatabase;

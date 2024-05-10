@@ -3,7 +3,9 @@
 #include "cpjview/client/loader/filter.hpp"
 #include "cpjview/client/loader/loader.hpp"
 #include "cpjview/client/sync/http_sync.hpp"
+#include "cpjview/client/utils/task_priority.hpp"
 #include "cpjview/common/argparser.hpp"
+#include "cpjview/common/scheduler.hpp"
 #include "spdlog/spdlog.h"
 #include <cstdlib>
 
@@ -65,12 +67,29 @@ int main(int argc, const char *argv[]) {
     std::exit(1);
   }
   spdlog::info("load compilation database successfully");
-  std::vector<std::unique_ptr<clang::ASTUnit>> asts = loader.create_ast();
 
-  for (std::unique_ptr<clang::ASTUnit> const &ast : asts) {
-    analysis::Context context{
-        .m_ast_unit = ast.get(), .m_filter = &filter, .m_storage = &storage};
-    analysis::InheritanceAnalysis{context}.start();
+  Scheduler scheduler{8U};
+
+  std::vector<Promise<loader::Loader::AstUnits>> create_ast_promises =
+      loader.create_ast(scheduler);
+
+  std::vector<Promise<void>> analysis_promises{};
+  for (Promise<loader::Loader::AstUnits> &promise : create_ast_promises) {
+    auto fn = [&promise, &filter, &storage]() -> void {
+      loader::Loader::AstUnits &ast_units = promise.wait();
+      for (std::unique_ptr<clang::ASTUnit> &ast : ast_units) {
+        analysis::Context context{.m_ast_unit = ast.get(),
+                                  .m_filter = &filter,
+                                  .m_storage = &storage};
+        analysis::InheritanceAnalysis{context}.start();
+      }
+    };
+    analysis_promises.push_back(
+        Promise<void>{AnalyzingPriority, fn, {&promise.get_task()}, scheduler});
+  }
+
+  for (Promise<void> &promise : analysis_promises) {
+    promise.wait();
   }
   spdlog::info("full analysis finished");
 }

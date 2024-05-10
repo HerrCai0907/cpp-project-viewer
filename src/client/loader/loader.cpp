@@ -1,5 +1,6 @@
 #include "cpjview/client/loader/loader.hpp"
 #include "cpjview/client/loader/filter.hpp"
+#include "cpjview/client/utils/task_priority.hpp"
 #include "cpjview/common/scheduler.hpp"
 #include "spdlog/spdlog.h"
 #include "clang/Frontend/ASTUnit.h"
@@ -32,40 +33,31 @@ Loader::load(llvm::StringRef compilation_database_path, Filter const &filter) {
   return Result<void, std::string>::success();
 }
 
-std::vector<std::unique_ptr<clang::ASTUnit>> Loader::create_ast() {
-  using ReturnType = std::vector<std::unique_ptr<clang::ASTUnit>>;
-  ReturnType asts{};
-  Scheduler scheduler{8u};
-  using Promise = TaskWithRet<ReturnType>;
-  std::vector<std::unique_ptr<Promise>> promises{};
+std::vector<Promise<Loader::AstUnits>>
+Loader::create_ast(Scheduler &scheduler) {
+  std::vector<Promise<AstUnits>> promises{};
   for (std::string const &file : m_target_files) {
-    promises.push_back(std::unique_ptr<Promise>{new Promise(
-        [this, file]() -> ReturnType {
-          spdlog::trace("[loader] generate ast for '{}'", file);
-          clang::tooling::ClangTool tool{*m_data_base, {file}};
-          ReturnType ast{};
-          switch (tool.buildASTs(ast)) {
-          case 0:
-            spdlog::debug("generate ast for '{} successfully'", file);
-            break;
-          case 1:
-            spdlog::error("generate ast for '{} failed'", file);
-            break;
-          case 2:
-            spdlog::warn("generate ast for '{} skipped'", file);
-            break;
-          }
-          return ast;
-        },
-        {}, scheduler)});
+    auto fn = [this, file]() -> std::vector<std::unique_ptr<clang::ASTUnit>> {
+      spdlog::trace("[loader] generate ast for '{}'", file);
+      clang::tooling::ClangTool tool{*m_data_base, {file}};
+      std::vector<std::unique_ptr<clang::ASTUnit>> ast{};
+      switch (tool.buildASTs(ast)) {
+      case 0:
+        spdlog::debug("generate ast for '{}' successfully", file);
+        break;
+      case 1:
+        spdlog::error("generate ast for '{}' failed", file);
+        break;
+      case 2:
+        spdlog::warn("generate ast for '{}' skipped", file);
+        break;
+      }
+      return ast;
+    };
+    promises.push_back(
+        Promise<AstUnits>{AstLoadingPriority, fn, {}, scheduler});
   }
-  for (std::unique_ptr<Promise> const &promise : promises) {
-    ReturnType const &ret = promise->wait();
-    for (std::unique_ptr<clang::ASTUnit> &ast : promise->wait()) {
-      asts.push_back(std::move(ast));
-    }
-  }
-  return asts;
+  return promises;
 }
 
 } // namespace cpjview::loader
