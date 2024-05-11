@@ -11,8 +11,8 @@
 namespace cpjview {
 
 static std::size_t get_task_id() {
-  static std::size_t id = 0U;
-  return id++;
+  static std::atomic<std::size_t> id = 0U;
+  return id.fetch_add(1);
 }
 
 Task::Task(std::uint8_t priority, std::function<void()> fn,
