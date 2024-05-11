@@ -54,8 +54,8 @@ Loader::create_ast(Scheduler &scheduler) {
       }
       return ast;
     };
-    promises.push_back(Promise<AstUnits>{
-        new TaskWithRet<AstUnits>(AstLoadingPriority, fn, {}, scheduler)});
+    promises.push_back(
+        Promise<AstUnits>{AstLoadingPriority, fn, {}, scheduler});
   }
   return promises;
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <__type_traits/unwrap_ref.h>
 #include <atomic>
 #include <cstddef>
 #include <functional>
@@ -22,43 +23,68 @@ class Task {
   std::size_t m_pre_count;
   std::size_t m_finished_pre_cont{0u};
   bool m_is_finished{false};
-  std::vector<Task *> m_post_tasks{};
+  std::vector<std::shared_ptr<Task>> m_post_tasks{};
   std::mutex m_mutex{}; // lock order should be from pre to post
   std::condition_variable m_cv{};
 
 public:
-  Task(std::uint8_t priority, std::function<void()> fn,
-       std::vector<Task *> const &pre_tasks, Scheduler &scheduler);
+  ~Task() { wait(); }
+
   void wait();
+
+  Task(std::uint8_t priority, std::function<void()> fn, std::size_t pre_count);
+
+  static void
+  sync_with_pre_tasks(std::shared_ptr<Task> self,
+                      std::vector<std::shared_ptr<Task>> const &pre_tasks,
+                      Scheduler &scheduler);
 
 private:
   void run(Scheduler &scheduler);
   void post_run(Scheduler &scheduler);
-  bool insert_post(Task *post_task);
-  void update_finished_pre_count(std::size_t finished_count,
-                                 Scheduler &scheduler);
+  bool insert_post(std::shared_ptr<Task> post_task);
+  static void update_finished_pre_count(std::shared_ptr<Task> &self,
+                                        std::size_t finished_count,
+                                        Scheduler &scheduler);
 };
 
-template <class T> class TaskWithRet {
+template <class T> class TaskWithRet : public Task {
   std::optional<T> m_ret;
-  Task m_task;
 
 public:
   TaskWithRet(std::uint8_t priority, std::function<T()> fn,
-              std::vector<Task *> const &pre_tasks, Scheduler &scheduler)
-      : m_ret{},
-        m_task{priority, [this, fn = std::move(fn)]() { m_ret = fn(); },
-               pre_tasks, scheduler} {}
-  T &wait() {
-    m_task.wait();
+              std::size_t pre_count)
+      : Task{priority, [this, fn = std::move(fn)]() { m_ret = fn(); },
+             pre_count},
+        m_ret{} {}
+  T &wait_for_value() {
+    Task::wait();
     return m_ret.value();
   }
-  Task &get_task() { return m_task; }
 };
 
-template <class T>
-using Promise = std::unique_ptr<
-    std::conditional_t<std::is_void_v<T>, Task, TaskWithRet<T>>>;
+template <class T> class Promise {
+  using Type = std::conditional_t<std::is_void_v<T>, Task, TaskWithRet<T>>;
+
+  std::shared_ptr<Type> m_task;
+
+public:
+  Promise(std::uint8_t priority, std::function<T()> fn,
+          std::vector<std::shared_ptr<Task>> const &pre_tasks,
+          Scheduler &scheduler)
+      : m_task(
+            std::make_shared<Type>(priority, std::move(fn), pre_tasks.size())) {
+    Task::sync_with_pre_tasks(std::static_pointer_cast<Task>(m_task), pre_tasks,
+                              scheduler);
+  }
+
+  void wait() { m_task->wait(); }
+  template <class = std::enable_if_t<!std::is_void_v<T>>> T &wait_for_value() {
+    m_task->wait();
+    return static_cast<TaskWithRet<T> *>(m_task.get())->wait_for_value();
+  }
+  std::shared_ptr<Type> get_task() { return m_task; }
+};
 
 class Scheduler {
   friend class Task;
@@ -77,8 +103,8 @@ public:
   ~Scheduler();
 
 private:
-  void mark_task_ready(Task *task);
-  Task *pop_ready_task(std::atomic_bool const &force_stop_flag);
+  void mark_task_ready(std::shared_ptr<Task> task);
+  std::shared_ptr<Task> pop_ready_task(std::atomic_bool const &force_stop_flag);
 };
 
 } // namespace cpjview
