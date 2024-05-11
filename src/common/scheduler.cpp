@@ -1,6 +1,7 @@
 #include "cpjview/common/scheduler.hpp"
 #include "spdlog/spdlog.h"
 #include <atomic>
+#include <cassert>
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -97,40 +98,39 @@ public:
   size_t size() const { return m_queue.size(); }
   bool empty() const { return m_queue.empty(); }
 
-  std::shared_ptr<Task> pop(std::atomic_bool const &force_stop_flag) {
-    enum ResumeReason { None, Stop, NewTask };
-    ResumeReason reason = ResumeReason::None;
+  std::shared_ptr<Task> pop(std::atomic<Thread::State> const &thread_state) {
     std::unique_lock<std::mutex> lock{m_mutex};
 
-    m_cv.wait(lock, [this, &force_stop_flag, &reason]() -> bool {
-      if (force_stop_flag) {
-        reason = ResumeReason::Stop;
-        return true;
-      }
-      if (!empty()) {
-        reason = ResumeReason::NewTask;
-        return true;
-      }
-      return false;
+    m_cv.wait(lock, [this, &thread_state]() -> bool {
+      return thread_state == Thread::State::Stop || !empty();
     });
-    if (reason == ResumeReason::Stop) {
+    switch (thread_state) {
+    case Thread::State::Idle: {
+      std::shared_ptr<Task> top = m_queue.top();
+      m_queue.pop();
+      return top;
+    }
+    case Thread::State::Busy: {
+      assert(false);
+      break;
+    }
+    case Thread::State::Stop: {
       return nullptr;
     }
-    assert(reason == ResumeReason::NewTask);
-    std::shared_ptr<Task> top = m_queue.top();
-    m_queue.pop();
-    return top;
+    }
   }
 
   void notify() { m_cv.notify_all(); }
 };
 
 Scheduler::Thread::Thread(Scheduler &scheduler)
-    : m_thread{}, m_stop_flag{false} {
+    : m_thread{}, m_state{State::Idle} {
   m_thread = std::thread([this, &scheduler]() {
-    while (!m_stop_flag) {
-      std::shared_ptr<Task> task = scheduler.pop_ready_task(m_stop_flag);
+    while (m_state != State::Stop) {
+      m_state = State::Idle;
+      std::shared_ptr<Task> task = scheduler.pop_ready_task(m_state);
       if (task != nullptr) {
+        m_state = State::Busy;
         task->run(scheduler);
       }
     }
@@ -138,15 +138,15 @@ Scheduler::Thread::Thread(Scheduler &scheduler)
 }
 
 Scheduler::Scheduler(std::size_t executor_count)
-    : m_ready_queue(new ReadyQueue()) {
+    : m_ready_queue(std::make_unique<ReadyQueue>()) {
   for (std::size_t index = 0; index < executor_count; index++) {
     m_thread_pool.push_back(std::make_unique<Thread>(*this));
   }
 }
 
 Scheduler::~Scheduler() {
-  for (std::unique_ptr<Thread> &wrapper : m_thread_pool) {
-    wrapper->m_stop_flag = true;
+  for (std::unique_ptr<Thread> &th : m_thread_pool) {
+    th->m_state = Thread::State::Stop;
   }
   m_ready_queue->notify();
   for (std::unique_ptr<Thread> &wrapper : m_thread_pool) {
@@ -163,8 +163,8 @@ void Scheduler::mark_task_ready(std::shared_ptr<Task> task) {
 }
 
 std::shared_ptr<Task>
-Scheduler::pop_ready_task(std::atomic_bool const &force_stop_flag) {
-  std::shared_ptr<Task> task = m_ready_queue->pop(force_stop_flag);
+Scheduler::pop_ready_task(std::atomic<Thread::State> const &thread_state) {
+  std::shared_ptr<Task> task = m_ready_queue->pop(thread_state);
   if (task != nullptr) {
     spdlog::trace("[scheduler] consume task {}, current size is {}", task->m_id,
                   m_ready_queue->size());

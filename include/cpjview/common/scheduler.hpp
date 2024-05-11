@@ -85,7 +85,8 @@ class Scheduler {
   struct Thread {
     Thread(Scheduler &scheduler);
     std::thread m_thread;
-    std::atomic_bool m_stop_flag;
+    enum class State { Idle, Busy, Stop };
+    std::atomic<State> m_state;
   };
 
   class ReadyQueue;
@@ -98,7 +99,8 @@ public:
 
 private:
   void mark_task_ready(std::shared_ptr<Task> task);
-  std::shared_ptr<Task> pop_ready_task(std::atomic_bool const &force_stop_flag);
+  std::shared_ptr<Task>
+  pop_ready_task(std::atomic<Thread::State> const &thread_state);
 };
 
 } // namespace cpjview
