@@ -76,7 +76,8 @@ int main(int argc, const char *argv[]) {
   std::vector<Promise<void>> analysis_promises{};
   for (Promise<loader::Loader::AstUnits> &promise : create_ast_promises) {
     auto fn = [&promise, &filter, &storage]() -> void {
-      loader::Loader::AstUnits &ast_units = promise.wait_for_value();
+      loader::Loader::AstUnits &ast_units =
+          promise.get_task()->wait_for_value();
       for (std::unique_ptr<clang::ASTUnit> &ast : ast_units) {
         analysis::Context context{.m_ast_unit = ast.get(),
                                   .m_filter = &filter,

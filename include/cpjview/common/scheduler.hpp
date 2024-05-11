@@ -78,11 +78,6 @@ public:
                               scheduler);
   }
 
-  void wait() { m_task->wait(); }
-  template <class = std::enable_if_t<!std::is_void_v<T>>> T &wait_for_value() {
-    m_task->wait();
-    return static_cast<TaskWithRet<T> *>(m_task.get())->wait_for_value();
-  }
   std::shared_ptr<Type> get_task() { return m_task; }
 };
 
