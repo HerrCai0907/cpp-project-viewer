@@ -23,11 +23,11 @@ Task::Task(std::uint8_t priority, std::function<void()> fn,
                 m_pre_count);
 }
 
-void Task::sync_with_pre_tasks(
-    std::shared_ptr<Task> self,
-    std::vector<std::shared_ptr<Task>> const &pre_tasks, Scheduler &scheduler) {
+void Task::sync_with_pre_tasks(std::shared_ptr<Task> self,
+                               std::vector<Task *> const &pre_tasks,
+                               Scheduler &scheduler) {
   std::size_t finished_pre = 0;
-  for (std::shared_ptr<Task> pre : pre_tasks) {
+  for (Task *pre : pre_tasks) {
     if (!pre->insert_post(self)) {
       finished_pre++;
     }
@@ -42,6 +42,8 @@ void Task::wait() {
 
 void Task::run(Scheduler &scheduler) {
   m_fn();
+  std::function<void()> empty = []() -> void {};
+  m_fn.swap(empty);
   post_run(scheduler);
   m_cv.notify_all();
 }

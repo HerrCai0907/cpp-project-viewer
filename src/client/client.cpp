@@ -70,14 +70,14 @@ int main(int argc, const char *argv[]) {
 
   Scheduler scheduler{8U};
 
-  std::vector<Promise<loader::Loader::AstUnits>> create_ast_promises =
-      loader.create_ast(scheduler);
-
   std::vector<Promise<void>> analysis_promises{};
-  for (Promise<loader::Loader::AstUnits> &promise : create_ast_promises) {
-    auto fn = [&promise, &filter, &storage]() -> void {
-      loader::Loader::AstUnits &ast_units =
-          promise.get_task()->wait_for_value();
+  auto analysis_inserter =
+      [&analysis_promises, &scheduler, &filter,
+       &storage](Promise<loader::Loader::AstUnits> &&promise) -> void {
+    Promise<loader::Loader::AstUnits> local_promise = std::move(promise);
+    auto fn = [task = local_promise.get_task(), &filter,
+               &storage]() mutable -> void {
+      loader::Loader::AstUnits &ast_units = task->wait_for_value();
       for (std::unique_ptr<clang::ASTUnit> &ast : ast_units) {
         analysis::Context context{.m_ast_unit = ast.get(),
                                   .m_filter = &filter,
@@ -85,13 +85,15 @@ int main(int argc, const char *argv[]) {
         analysis::InheritanceAnalysis{context}.start();
       }
     };
-    analysis_promises.push_back(
-        Promise<void>{AnalyzingPriority, fn, {promise.get_task()}, scheduler});
-  }
+    analysis_promises.push_back(Promise<void>{
+        AnalyzingPriority, fn, {local_promise.get_task().get()}, scheduler});
+  };
+  Promise<loader::Loader::AstUnits>::for_each(loader.create_ast(scheduler),
+                                              analysis_inserter);
 
-  for (Promise<void> &promise : analysis_promises) {
-    promise.get_task()->wait();
-  }
+  Promise<void>::for_each(
+      std::move(analysis_promises),
+      [](Promise<void> &&promise) -> void { promise.get_task()->wait(); });
 
   spdlog::info("full analysis finished");
 }

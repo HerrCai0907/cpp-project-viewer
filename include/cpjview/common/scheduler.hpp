@@ -33,10 +33,9 @@ public:
 
   Task(std::uint8_t priority, std::function<void()> fn, std::size_t pre_count);
 
-  static void
-  sync_with_pre_tasks(std::shared_ptr<Task> self,
-                      std::vector<std::shared_ptr<Task>> const &pre_tasks,
-                      Scheduler &scheduler);
+  static void sync_with_pre_tasks(std::shared_ptr<Task> self,
+                                  std::vector<Task *> const &pre_tasks,
+                                  Scheduler &scheduler);
 
 private:
   void run(Scheduler &scheduler);
@@ -69,12 +68,18 @@ template <class T> class Promise {
 
 public:
   Promise(std::uint8_t priority, std::function<T()> fn,
-          std::vector<std::shared_ptr<Task>> const &pre_tasks,
-          Scheduler &scheduler)
+          std::vector<Task *> const &pre_tasks, Scheduler &scheduler)
       : m_task(
             std::make_shared<Type>(priority, std::move(fn), pre_tasks.size())) {
     Task::sync_with_pre_tasks(std::static_pointer_cast<Task>(m_task), pre_tasks,
                               scheduler);
+  }
+
+  static void for_each(std::vector<Promise> &&promises,
+                       std::function<void(Promise &&)> fn) {
+    for (Promise &promise : promises) {
+      fn(std::move(promise));
+    }
   }
 
   std::shared_ptr<Type> const &get_task() { return m_task; }
