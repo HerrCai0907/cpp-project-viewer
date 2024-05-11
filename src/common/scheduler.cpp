@@ -125,7 +125,7 @@ public:
   void notify() { m_cv.notify_all(); }
 };
 
-Scheduler::ThreadWrapper::ThreadWrapper(Scheduler &scheduler)
+Scheduler::Thread::Thread(Scheduler &scheduler)
     : m_thread{}, m_stop_flag{false} {
   m_thread = std::thread([this, &scheduler]() {
     while (!m_stop_flag) {
@@ -140,16 +140,16 @@ Scheduler::ThreadWrapper::ThreadWrapper(Scheduler &scheduler)
 Scheduler::Scheduler(std::size_t executor_count)
     : m_ready_queue(new ReadyQueue()) {
   for (std::size_t index = 0; index < executor_count; index++) {
-    m_thread_pool.push_back(std::make_unique<ThreadWrapper>(*this));
+    m_thread_pool.push_back(std::make_unique<Thread>(*this));
   }
 }
 
 Scheduler::~Scheduler() {
-  for (std::unique_ptr<ThreadWrapper> &wrapper : m_thread_pool) {
+  for (std::unique_ptr<Thread> &wrapper : m_thread_pool) {
     wrapper->m_stop_flag = true;
   }
   m_ready_queue->notify();
-  for (std::unique_ptr<ThreadWrapper> &wrapper : m_thread_pool) {
+  for (std::unique_ptr<Thread> &wrapper : m_thread_pool) {
     if (wrapper->m_thread.joinable()) {
       wrapper->m_thread.join();
     }
