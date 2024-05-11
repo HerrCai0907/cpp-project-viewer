@@ -95,24 +95,26 @@ public:
     }
     m_cv.notify_one();
   }
-  size_t size() const { return m_queue.size(); }
-  bool empty() const { return m_queue.empty(); }
+  size_t size() {
+    std::lock_guard<std::mutex> lock{m_mutex};
+    return m_queue.size();
+  }
+  bool empty() {
+    std::lock_guard<std::mutex> lock{m_mutex};
+    return m_queue.empty();
+  }
 
   std::shared_ptr<Task> pop(std::atomic<Thread::State> const &thread_state) {
     std::unique_lock<std::mutex> lock{m_mutex};
 
     m_cv.wait(lock, [this, &thread_state]() -> bool {
-      return thread_state == Thread::State::Stop || !empty();
+      return thread_state == Thread::State::Stop || !m_queue.empty();
     });
     switch (thread_state) {
-    case Thread::State::Idle: {
+    case Thread::State::Busy: {
       std::shared_ptr<Task> top = m_queue.top();
       m_queue.pop();
       return top;
-    }
-    case Thread::State::Busy: {
-      assert(false);
-      break;
     }
     case Thread::State::Stop: {
       return nullptr;
@@ -120,17 +122,15 @@ public:
     }
   }
 
-  void notify() { m_cv.notify_all(); }
+  void notify_cv() { m_cv.notify_all(); }
 };
 
 Scheduler::Thread::Thread(Scheduler &scheduler)
-    : m_thread{}, m_state{State::Idle} {
+    : m_thread{}, m_state{State::Busy} {
   m_thread = std::thread([this, &scheduler]() {
     while (m_state != State::Stop) {
-      m_state = State::Idle;
       std::shared_ptr<Task> task = scheduler.pop_ready_task(m_state);
       if (task != nullptr) {
-        m_state = State::Busy;
         task->run(scheduler);
       }
     }
@@ -148,7 +148,7 @@ Scheduler::~Scheduler() {
   for (std::unique_ptr<Thread> &th : m_thread_pool) {
     th->m_state = Thread::State::Stop;
   }
-  m_ready_queue->notify();
+  m_ready_queue->notify_cv();
   for (std::unique_ptr<Thread> &wrapper : m_thread_pool) {
     if (wrapper->m_thread.joinable()) {
       wrapper->m_thread.join();

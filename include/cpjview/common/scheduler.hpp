@@ -85,7 +85,7 @@ class Scheduler {
   struct Thread {
     Thread(Scheduler &scheduler);
     std::thread m_thread;
-    enum class State { Idle, Busy, Stop };
+    enum class State { Busy, Stop };
     std::atomic<State> m_state;
   };
 
