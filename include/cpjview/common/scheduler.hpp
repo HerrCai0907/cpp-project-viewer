@@ -1,6 +1,5 @@
 #pragma once
 
-#include <__type_traits/unwrap_ref.h>
 #include <atomic>
 #include <cstddef>
 #include <functional>
@@ -78,7 +77,7 @@ public:
                               scheduler);
   }
 
-  std::shared_ptr<Type> get_task() { return m_task; }
+  std::shared_ptr<Type> const &get_task() { return m_task; }
 };
 
 class Scheduler {

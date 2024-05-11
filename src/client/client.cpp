@@ -83,11 +83,14 @@ int main(int argc, const char *argv[]) {
                                   .m_filter = &filter,
                                   .m_storage = &storage};
         analysis::InheritanceAnalysis{context}.start();
-        ast.reset();
       }
     };
     analysis_promises.push_back(
         Promise<void>{AnalyzingPriority, fn, {promise.get_task()}, scheduler});
+  }
+
+  for (Promise<void> &promise : analysis_promises) {
+    promise.get_task()->wait();
   }
 
   spdlog::info("full analysis finished");
