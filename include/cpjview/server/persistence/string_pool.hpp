@@ -1,6 +1,7 @@
 #pragma once
 
 #include <set>
+
 namespace cpjview::persistence {
 
 class StringPool {
@@ -8,6 +9,8 @@ class StringPool {
   StringCacheType m_string_cache{};
 
 public:
+  using StringIndex = const char *; // FIXME
+
   const char *ensure_string_in_cache(std::string_view str) {
     StringCacheType::const_iterator it =
         m_string_cache.insert(std::string{str}).first;
