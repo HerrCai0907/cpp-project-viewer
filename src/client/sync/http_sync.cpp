@@ -32,7 +32,7 @@ void HttpSync::add_inheritance_relationship(std::string const &derived,
                   httplib::to_string(ret.error()));
     exit(-1);
   }
-  spdlog::debug("ret {}", ret->reason);
+  spdlog::debug("http response {}", ret->reason);
 }
 
 } // namespace cpjview::sync

@@ -13,20 +13,16 @@ class CppClass {
   derivedClasses: CppClass[] = [];
 
   toTreeNode(): TreeDataNode {
-    const key = this.name;
-    return {
-      key,
-      title: this.name,
-      children: this.derivedClasses.map((c) => c._toTreeNode(key)),
-    };
+    return this._toTreeNode(this.name);
   }
 
-  _toTreeNode(parent_key: string): TreeDataNode {
-    const key = `${parent_key}-${this.name}`;
+  _toTreeNode(key: string): TreeDataNode {
     return {
       key,
       title: this.name,
-      children: this.derivedClasses.map((c) => c._toTreeNode(key)),
+      children: this.derivedClasses
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((c) => c._toTreeNode(`${key}-${c.name}`)),
     };
   }
 }
@@ -43,7 +39,7 @@ function createCppClasses(dependencies: { base: string; derived: string }[]) {
     baseClass.derivedClasses.push(derivedClass);
     derivedClass.isFirstBase = false;
   }
-  return classMapping;
+  return Array.from(classMapping.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 const Deps: React.FC<P> = (prop) => {
@@ -62,7 +58,7 @@ const Deps: React.FC<P> = (prop) => {
 
     const classes = createCppClasses(dependencies);
     let treeData: TreeDataNode[] = [];
-    for (let [_, info] of classes) {
+    for (let info of classes) {
       if (info.isFirstBase) {
         treeData.push(info.toTreeNode());
       }
