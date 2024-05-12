@@ -1,9 +1,7 @@
-#include "cpjview/client/analysis/analysis.hpp"
-#include "cpjview/client/analysis/inheritance.hpp"
+#include "cpjview/client/analysis/analysis_manager.hpp"
 #include "cpjview/client/loader/filter.hpp"
 #include "cpjview/client/loader/loader.hpp"
 #include "cpjview/client/sync/http_sync.hpp"
-#include "cpjview/client/utils/task_priority.hpp"
 #include "cpjview/common/argparser.hpp"
 #include "cpjview/common/scheduler.hpp"
 #include "spdlog/spdlog.h"
@@ -70,27 +68,15 @@ int main(int argc, const char *argv[]) {
 
   Scheduler scheduler{8U};
 
-  std::vector<Promise<void>> analysis_promises{};
-  auto analysis_inserter =
-      [&analysis_promises, &scheduler, &filter,
-       &storage](Promise<loader::Loader::AstUnits> &&promise) -> void {
-    Promise<loader::Loader::AstUnits> local_promise = std::move(promise);
-    auto fn = [task = local_promise.get_task(), &filter,
-               &storage]() mutable -> void {
-      loader::Loader::AstUnits &ast_units = task->wait_for_value();
-      for (std::unique_ptr<clang::ASTUnit> &ast : ast_units) {
-        analysis::Context context{.m_ast_unit = ast.get(),
-                                  .m_filter = &filter,
-                                  .m_storage = &storage};
-        analysis::InheritanceAnalysis{context}.start();
-      }
-    };
-    analysis_promises.push_back(Promise<void>{
-        AnalyzingPriority, fn, {local_promise.get_task().get()}, scheduler});
-  };
-  Promise<loader::Loader::AstUnits>::for_each(loader.create_ast(scheduler),
-                                              analysis_inserter);
+  analysis::AnalysisManager analysis_manager{scheduler, filter, storage};
 
+  std::vector<Promise<void>> analysis_promises{};
+  Promise<loader::Loader::AstUnits>::for_each(
+      loader.create_ast(scheduler),
+      [&analysis_manager,
+       &analysis_promises](Promise<loader::Loader::AstUnits> &&promise) {
+        analysis_manager.analysis(analysis_promises, std::move(promise));
+      });
   Promise<void>::for_each(
       std::move(analysis_promises),
       [](Promise<void> &&promise) -> void { promise.get_task()->wait(); });

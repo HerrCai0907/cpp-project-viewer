@@ -82,7 +82,7 @@ public:
     }
   }
 
-  std::shared_ptr<Type> const &get_task() { return m_task; }
+  std::shared_ptr<Type> const &get_task() const { return m_task; }
 };
 
 class Scheduler {
