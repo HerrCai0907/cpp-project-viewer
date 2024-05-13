@@ -31,7 +31,7 @@ enum class SymbolKind {
 };
 
 enum class RelationshipKind {
-  Inheritance,
+  Inheritance, // derived -> base
 };
 
 class Symbol;
@@ -55,8 +55,8 @@ public:
   Relationship(Symbol *source, Symbol *target)
       : m_source(source), m_target(target) {}
 
-  Symbol *get_source() { return m_source; }
-  Symbol *get_target() { return m_target; }
+  Symbol *get_source() const { return m_source; }
+  Symbol *get_target() const { return m_target; }
 };
 
 class ClassSymbol;
@@ -68,6 +68,8 @@ class ClassSymbol : public Symbol {
 
 public:
   explicit ClassSymbol(StringPool::StringIndex const &name) : m_name(name) {}
+
+  StringPool::StringIndex get_name() const { return m_name; }
 };
 
 class Inheritance : public Relationship {
@@ -75,10 +77,10 @@ public:
   Inheritance(ClassSymbol *source, ClassSymbol *target)
       : Relationship(source, target) {}
 
-  ClassSymbol *get_source() {
+  ClassSymbol *get_source() const {
     return Relationship::get_source()->cast<ClassSymbol>();
   }
-  ClassSymbol *get_target() {
+  ClassSymbol *get_target() const {
     return Relationship::get_target()->cast<ClassSymbol>();
   }
 };

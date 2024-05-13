@@ -43,4 +43,11 @@ void Project::ensure_relationship(StringPool::StringIndex source,
   ensure_relationship(source_node, target_node, kind);
 }
 
+void Project::for_each_relationship(
+    std::function<void(Relationship const *)> fn) const {
+  for (auto const &[relationship, _] : m_relationship_map) {
+    fn(relationship);
+  }
+}
+
 } // namespace cpjview::persistence

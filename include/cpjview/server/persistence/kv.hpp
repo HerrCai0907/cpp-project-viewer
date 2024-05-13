@@ -25,19 +25,10 @@ public:
     return it == m_map.end() ? nullptr : &it->second;
   }
   Iterator renew(StringPool::StringIndex key) {
-    return m_map.insert_or_assign(key, E{}).first;
+    return m_map.emplace(key, E{}).first;
   }
   Iterator try_add(StringPool::StringIndex key) {
     return m_map.try_emplace(key, E{}).first;
-  }
-
-  ErrorCodeResult modify(StringPool::StringIndex key,
-                         std::function<ErrorCodeResult(E &)> const &fn) {
-    Iterator it = m_map.find(key);
-    if (it == m_map.end()) {
-      it = renew(key);
-    }
-    return fn(it->second);
   }
 
   Iterator begin() { return m_map.begin(); }

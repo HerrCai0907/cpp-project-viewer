@@ -21,6 +21,9 @@ public:
   void ensure_relationship(StringPool::StringIndex source,
                            StringPool::StringIndex target,
                            RelationshipKind kind);
+
+  void
+  for_each_relationship(std::function<void(Relationship const *)> fn) const;
 };
 
 } // namespace cpjview::persistence
