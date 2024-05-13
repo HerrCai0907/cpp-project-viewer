@@ -1,49 +1,29 @@
 #pragma once
 
-#include "cpjview/server/persistence/error_code.hpp"
-#include "cpjview/server/persistence/inheritance.hpp"
+#include "cpjview/server/persistence/entity.hpp"
 #include "cpjview/server/persistence/kv.hpp"
+#include "cpjview/server/persistence/string_pool.hpp"
+#include <map>
+#include <memory>
 
 namespace cpjview::persistence {
 
 class Project {
-public:
-  struct Info {
-    Inheritance m_inheritance{};
-  };
-
-  using Iterator = SearchMap<Info>::Iterator;
-  using ConstIterator = SearchMap<Info>::ConstIterator;
-
-private:
-  SearchMap<Info> m_search_map;
+  SearchMap<std::unique_ptr<Symbol>> m_node_map{};
+  std::map<Relationship *, std::unique_ptr<Relationship>> m_relationship_map{};
 
 public:
-  ErrorCodeResult create(const char *name) {
-    if (m_search_map.contains(name)) {
-      return ErrorCodeResult::failed(ErrorCode::forbidden());
-    }
-    m_search_map.renew(name);
-    return ErrorCodeResult::success();
-  }
+  Symbol *ensure_node(StringPool::StringIndex name, SymbolKind kind);
 
-  ErrorCodeResult force_create(const char *name) {
-    m_search_map.renew(name);
-    return ErrorCodeResult::success();
-  }
+  void ensure_relationship(Symbol *source, Symbol *target,
+                           RelationshipKind kind);
 
-  ErrorCodeResult
-  modify_info(const char *key,
-              std::function<ErrorCodeResult(Info &)> const &fn) {
-    return m_search_map.modify(key, fn);
-  }
+  void ensure_relationship(StringPool::StringIndex source,
+                           StringPool::StringIndex target,
+                           RelationshipKind kind);
 
-  Info *get_info(const char *key) { return m_search_map.get(key); }
-
-  Iterator begin() { return m_search_map.begin(); }
-  Iterator end() { return m_search_map.end(); }
-  ConstIterator begin() const { return m_search_map.begin(); }
-  ConstIterator end() const { return m_search_map.end(); }
+  void
+  for_each_relationship(std::function<void(Relationship const *)> fn) const;
 };
 
 } // namespace cpjview::persistence
