@@ -1,12 +1,6 @@
 import * as esbuild from "esbuild";
 import { argv } from "node:process";
 
-const importMapping = {
-  react: "React",
-  "react-dom": "ReactDOM",
-  "react-dom/client": "ReactDOM",
-};
-
 /**
  * @type {esbuild.BuildOptions}
  */
