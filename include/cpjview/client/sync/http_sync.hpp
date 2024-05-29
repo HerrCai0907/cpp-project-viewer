@@ -15,6 +15,8 @@ public:
 
   void add_inheritance_relationship(std::string const &derived,
                                     std::string const &base) override;
+
+  void add_code(std::string const &name, std::string const &code) override;
 };
 
 } // namespace cpjview::sync

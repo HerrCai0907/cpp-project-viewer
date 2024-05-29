@@ -15,7 +15,11 @@ Symbol *Project::ensure_node(StringPool::StringIndex name, SymbolKind kind) {
   case SymbolKind::ClassNode:
     it->second.reset(new ClassSymbol(name));
     break;
+  case SymbolKind::CodeNode:
+    it->second.reset(new CodeSymbol(name));
+    break;
   }
+  assert(it->second != nullptr);
   return it->second.get();
 }
 
@@ -23,12 +27,20 @@ void Project::ensure_relationship(Symbol *source, Symbol *target,
                                   RelationshipKind kind) {
   Relationship *relationship = nullptr;
   switch (kind) {
-  case RelationshipKind::Inheritance:
+  case RelationshipKind::Inheritance: {
     auto inheritance = std::make_unique<Inheritance>(
         source->cast<ClassSymbol>(), target->cast<ClassSymbol>());
     relationship = inheritance.get();
     m_relationship_map.insert_or_assign(relationship, std::move(inheritance));
     break;
+  }
+  case RelationshipKind::SourceCode: {
+    auto source_code = std::make_unique<SourceCode>(source->cast<ClassSymbol>(),
+                                                    target->cast<CodeSymbol>());
+    relationship = source_code.get();
+    m_relationship_map.insert_or_assign(relationship, std::move(source_code));
+    break;
+  }
   };
   assert(relationship != nullptr);
   source->add_relationship(kind, relationship);
@@ -36,11 +48,22 @@ void Project::ensure_relationship(Symbol *source, Symbol *target,
 }
 
 void Project::ensure_relationship(StringPool::StringIndex source,
+                                  SymbolKind source_kind,
                                   StringPool::StringIndex target,
+                                  SymbolKind target_kind,
                                   RelationshipKind kind) {
-  auto source_node = ensure_node(source, SymbolKind::ClassNode);
-  auto target_node = ensure_node(target, SymbolKind::ClassNode);
+  Symbol *source_node = ensure_node(source, source_kind);
+  Symbol *target_node = ensure_node(target, target_kind);
+
   ensure_relationship(source_node, target_node, kind);
+}
+
+Symbol *Project::get_node(StringPool::StringIndex name) {
+  std::unique_ptr<Symbol> *node = m_node_map.get(name);
+  if (node != nullptr) {
+    return node->get();
+  }
+  return nullptr;
 }
 
 void Project::for_each_relationship(

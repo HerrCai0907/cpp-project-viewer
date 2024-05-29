@@ -1,5 +1,6 @@
 #include "cpjview/server/http/http.hpp"
 #include "cpjview/common/result.hpp"
+#include "cpjview/protocol/code.hpp"
 #include "cpjview/protocol/inheritance.hpp"
 #include "cpjview/server/persistence/error_code.hpp"
 #include "cpjview/server/persistence/storage.hpp"
@@ -84,6 +85,7 @@ private:
   void register_apis() {
     register_project();
     register_inheritance();
+    register_code();
   }
 
   void register_project() {
@@ -123,6 +125,7 @@ private:
           inheritances = m_storage.get_all_inheritance(project);
       if (inheritances.nok()) {
         response.status = static_cast<int>(inheritances.take_error().m_code);
+        spdlog::warn("[http] error code {}", response.status);
         return;
       }
       nlohmann::json content_json = nlohmann::json::array();
@@ -133,6 +136,40 @@ private:
             {"derived", relationship.derived},
         });
       }
+      const std::string content = content_json.dump();
+      spdlog::trace("[http] response {}", content);
+      response.set_content(content, "application/json");
+    });
+  }
+
+  void register_code() {
+    constexpr const char *patch_pattern =
+        "/api/v1/projects/:project/source_codes";
+    m_server.Patch(patch_pattern, [this](const httplib::Request &request,
+                                         httplib::Response &response) {
+      spdlog::trace("[http] recv {}", to_string(request));
+      std::string const &project = request.path_params.at("project");
+      protocol::Code code = protocol::Code::from_json(request.body);
+      m_storage.put_code(project, code.m_name, code.m_code);
+    });
+    constexpr const char *get_pattern =
+        "/api/v1/projects/:project/source_codes/:symbol_name";
+    m_server.Get(get_pattern, [this](const httplib::Request &request,
+                                     httplib::Response &response) {
+      spdlog::trace("[http] recv {}", to_string(request));
+      std::string const &project = request.path_params.at("project");
+      std::string const &symbol_name = request.path_params.at("symbol_name");
+      Result<const char *, persistence::ErrorCode> source_code =
+          m_storage.get_code(project, symbol_name);
+      if (source_code.nok()) {
+        response.status = static_cast<int>(source_code.take_error().m_code);
+        spdlog::warn("[http] error code {}", response.status);
+        return;
+      }
+      nlohmann::json content_json = {
+          {"symbol_name", symbol_name},
+          {"source_code", source_code.get()},
+      };
       const std::string content = content_json.dump();
       spdlog::trace("[http] response {}", content);
       response.set_content(content, "application/json");

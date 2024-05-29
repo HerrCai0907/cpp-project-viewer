@@ -29,6 +29,12 @@ public:
   Result<std::vector<InheritancePair>, ErrorCode>
   get_all_inheritance(std::string const &project_name) const;
 
+  void put_code(std::string const &project_name, std::string const &name,
+                std::string const &code);
+
+  Result<const char *, ErrorCode> get_code(std::string const &project_name,
+                                           std::string const &name) noexcept;
+
 private:
   StorageImpl *m_impl;
 };
