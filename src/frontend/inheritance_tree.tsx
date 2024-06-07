@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Tree, TreeDataNode } from "antd";
+import CodeCard from "./code_card";
 
-type P = { project: string | null };
+type P = { project: string | null; onDisplay: (node: React.ReactNode) => any };
 type S = {
   treeData: TreeDataNode[];
   project: string | null;
@@ -48,7 +49,7 @@ const InheritanceTree: React.FC<P> = (prop) => {
     project: null,
   });
 
-  async function update() {
+  (async function () {
     if (prop.project == status.project) {
       return;
     }
@@ -68,15 +69,21 @@ const InheritanceTree: React.FC<P> = (prop) => {
       project: prop.project,
       treeData: treeData,
     });
-  }
-  update();
+  })();
+
+  let onSelect = async (_: unknown, { node }: { node: TreeDataNode }) => {
+    const { source_code: sourceCode, symbol_name: symbolName }: { source_code: string; symbol_name: string } = await (
+      await fetch(`/api/v1/projects/${prop.project}/source_codes/${node.title}`)
+    ).json();
+    prop.onDisplay(<CodeCard sourceCode={sourceCode} symbolName={symbolName} />);
+  };
 
   if (prop.project == null) {
     return <div></div>;
   }
   return (
     <div>
-      <Tree showLine={true} showIcon={false} treeData={status.treeData} />
+      <Tree showLine={true} showIcon={false} treeData={status.treeData} onSelect={onSelect} />
     </div>
   );
 };

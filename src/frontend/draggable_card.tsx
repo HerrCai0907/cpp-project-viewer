@@ -4,10 +4,10 @@ import Draggable from "react-draggable";
 
 const { Meta } = Card;
 
-const draggable_card: React.FC<{ children: React.ReactNode; title: string }> = ({ children, title }) => {
+const DraggableCard: React.FC<{ children: React.ReactNode; title: string }> = ({ children, title }) => {
   return (
     <Draggable handle="strong">
-      <Card hoverable={true}>
+      <Card hoverable={true} style={{ width: 300 }}>
         <strong className="cursor">
           <Meta title={title}></Meta>
         </strong>
@@ -18,4 +18,4 @@ const draggable_card: React.FC<{ children: React.ReactNode; title: string }> = (
   );
 };
 
-export default draggable_card;
+export default DraggableCard;

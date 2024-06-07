@@ -5,9 +5,14 @@ import DraggableCard from "./draggable_card";
 
 export default function app() {
   const [project, setProject] = useState<string | null>(null);
+  const [flexibleCards, setFlexibleCards] = useState<React.ReactNode[]>([]);
 
   const onChange = (value: string) => {
     setProject(value);
+  };
+
+  const onDisplay = (node: React.ReactNode) => {
+    setFlexibleCards(flexibleCards.concat([node]));
   };
 
   return (
@@ -16,8 +21,9 @@ export default function app() {
         <ProjectSelector onChange={onChange}></ProjectSelector>
       </DraggableCard>
       <DraggableCard title="InheritanceTree">
-        <InheritanceTree project={project}></InheritanceTree>
+        <InheritanceTree project={project} onDisplay={onDisplay}></InheritanceTree>
       </DraggableCard>
+      {...flexibleCards}
     </div>
   );
 }
