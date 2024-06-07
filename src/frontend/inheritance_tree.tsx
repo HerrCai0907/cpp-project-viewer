@@ -42,7 +42,7 @@ function createCppClasses(dependencies: { base: string; derived: string }[]) {
   return Array.from(classMapping.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-const Deps: React.FC<P> = (prop) => {
+const InheritanceTree: React.FC<P> = (prop) => {
   const [status, setStatus] = useState<S>({
     treeData: [],
     project: null,
@@ -81,4 +81,4 @@ const Deps: React.FC<P> = (prop) => {
   );
 };
 
-export default Deps;
+export default InheritanceTree;
