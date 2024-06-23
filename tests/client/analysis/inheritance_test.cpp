@@ -31,6 +31,8 @@ struct TestSync : public sync::ISync {
   MOCK_METHOD(void, add_inheritance_relationship,
               (std::string const &derived, std::string const &base),
               (override));
+  MOCK_METHOD(void, add_code,
+              (std::string const &name, std::string const &code), (override));
 };
 
 struct TestParm {

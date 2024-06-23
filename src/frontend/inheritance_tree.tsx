@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { Tree, TreeDataNode } from "antd";
+import CodeCard from "./code_card";
 
-type P = { project: string | null };
+type P = {
+  project: string | null;
+  onDisplayCode: (sourceCode: string, symbolName: string) => void;
+};
 type S = {
   treeData: TreeDataNode[];
   project: string | null;
@@ -39,16 +43,18 @@ function createCppClasses(dependencies: { base: string; derived: string }[]) {
     baseClass.derivedClasses.push(derivedClass);
     derivedClass.isFirstBase = false;
   }
-  return Array.from(classMapping.values()).sort((a, b) => a.name.localeCompare(b.name));
+  return Array.from(classMapping.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 }
 
-const Deps: React.FC<P> = (prop) => {
+const InheritanceTree: React.FC<P> = (prop) => {
   const [status, setStatus] = useState<S>({
     treeData: [],
     project: null,
   });
 
-  async function update() {
+  (async function () {
     if (prop.project == status.project) {
       return;
     }
@@ -68,17 +74,31 @@ const Deps: React.FC<P> = (prop) => {
       project: prop.project,
       treeData: treeData,
     });
-  }
-  update();
+  })();
+
+  let onSelect = async (_: unknown, { node }: { node: TreeDataNode }) => {
+    const {
+      source_code: sourceCode,
+      symbol_name: symbolName,
+    }: { source_code: string; symbol_name: string } = await (
+      await fetch(`/api/v1/projects/${prop.project}/source_codes/${node.title}`)
+    ).json();
+    prop.onDisplayCode(sourceCode, symbolName);
+  };
 
   if (prop.project == null) {
     return <div></div>;
   }
   return (
     <div>
-      <Tree showLine={true} showIcon={false} treeData={status.treeData} />
+      <Tree
+        showLine={true}
+        showIcon={false}
+        treeData={status.treeData}
+        onSelect={onSelect}
+      />
     </div>
   );
 };
 
-export default Deps;
+export default InheritanceTree;

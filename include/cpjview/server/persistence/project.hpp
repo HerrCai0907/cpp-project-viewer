@@ -19,8 +19,11 @@ public:
                            RelationshipKind kind);
 
   void ensure_relationship(StringPool::StringIndex source,
+                           SymbolKind source_kind,
                            StringPool::StringIndex target,
-                           RelationshipKind kind);
+                           SymbolKind target_kind, RelationshipKind kind);
+
+  Symbol *get_node(StringPool::StringIndex name);
 
   void
   for_each_relationship(std::function<void(Relationship const *)> fn) const;

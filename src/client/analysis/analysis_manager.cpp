@@ -1,5 +1,6 @@
 #include "cpjview/client/analysis/analysis_manager.hpp"
 #include "cpjview/client/analysis/analysis.hpp"
+#include "cpjview/client/analysis/code_splitter.hpp"
 #include "cpjview/client/analysis/inheritance.hpp"
 #include "cpjview/client/loader/loader.hpp"
 #include "cpjview/client/utils/task_priority.hpp"
@@ -16,6 +17,7 @@ void AnalysisManager::analysis(std::vector<Promise<void>> &analysis_promises,
                                 .m_filter = &m_filter,
                                 .m_storage = &m_storage};
       analysis::InheritanceAnalysis{context}.start();
+      analysis::CodeSplitter{context}.start();
     }
   };
   analysis_promises.push_back(Promise<void>{

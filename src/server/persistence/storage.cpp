@@ -4,6 +4,7 @@
 #include "cpjview/server/persistence/kv.hpp"
 #include "cpjview/server/persistence/project.hpp"
 #include "cpjview/server/persistence/string_pool.hpp"
+#include "spdlog/spdlog.h"
 #include <string>
 
 namespace cpjview::persistence {
@@ -56,7 +57,8 @@ void Storage::add_inheritance(std::string const &project_name,
       m_impl->ensure_string_in_cache(derived);
 
   m_impl->ensure_project(project_name_index)
-      .ensure_relationship(derived_index, base_index,
+      .ensure_relationship(derived_index, SymbolKind::ClassNode, base_index,
+                           SymbolKind::ClassNode,
                            RelationshipKind::Inheritance);
 }
 
@@ -83,6 +85,54 @@ Storage::get_all_inheritance(std::string const &project_name) const {
     });
   });
   return RT::success(std::move(ret));
+}
+
+// ================================================================
+// =========================== Code ===============================
+// ================================================================
+
+void Storage::put_code(std::string const &project_name, std::string const &name,
+                       std::string const &code) {
+  StringPool::StringIndex project_name_index =
+      m_impl->ensure_string_in_cache(project_name);
+  StringPool::StringIndex name_index = m_impl->ensure_string_in_cache(name);
+  StringPool::StringIndex code_index = m_impl->ensure_string_in_cache(code);
+
+  m_impl->ensure_project(project_name_index)
+      .ensure_relationship(name_index, SymbolKind::ClassNode, code_index,
+                           SymbolKind::CodeNode, RelationshipKind::SourceCode);
+}
+
+Result<const char *, ErrorCode>
+Storage::get_code(std::string const &project_name,
+                  std::string const &name) noexcept {
+  using RT = Result<const char *, ErrorCode>;
+
+  StringPool::StringIndex project_name_index =
+      m_impl->ensure_string_in_cache(project_name);
+  StringPool::StringIndex name_index = m_impl->ensure_string_in_cache(name);
+
+  Project *project = m_impl->m_project_map.get(project_name_index);
+  if (project == nullptr) {
+    return RT::failed(ErrorCode::not_found());
+  }
+  ClassSymbol *symbol = project->get_node(name_index)->dyn_cast<ClassSymbol>();
+  if (symbol == nullptr) {
+    spdlog::warn("[persistence] cannot find class symbol for {}", name);
+    return RT::failed(ErrorCode::not_found());
+  }
+
+  Relationship *relationship =
+      symbol->get_relationship(RelationshipKind::SourceCode);
+  if (relationship == nullptr) {
+    spdlog::warn("[persistence] cannot source code relationship for {}", name);
+    return RT::failed(ErrorCode::not_found());
+  }
+  StringPool::StringIndex code = relationship->cast<SourceCode>()
+                                     ->get_target()
+                                     ->cast<CodeSymbol>()
+                                     ->get_code();
+  return RT::success(code);
 }
 
 } // namespace cpjview::persistence
