@@ -1,18 +1,38 @@
 import React from "react";
-import { Card, Divider } from "antd";
+import { Card, Divider, Flex } from "antd";
 import Draggable from "react-draggable";
+import { Button } from "antd";
 
-const { Meta } = Card;
+const OptionalQuitButton: React.FC<{
+  onExit?: () => void;
+}> = (p) => {
+  if (p.onExit) {
+    return (
+      <Button type="primary" danger size="small" onClick={p.onExit}>
+        x
+      </Button>
+    );
+  } else {
+    return <></>;
+  }
+};
 
-const DraggableCard: React.FC<{ children: React.ReactNode; title: string }> = ({ children, title }) => {
+const DraggableCard: React.FC<{
+  children: React.ReactNode;
+  title: string;
+  onExit?: () => void;
+}> = (p) => {
   return (
     <Draggable handle="strong">
       <Card hoverable={true} style={{ width: 300 }}>
-        <strong className="cursor">
-          <Meta title={title}></Meta>
-        </strong>
+        <Flex justify="space-around" align="center">
+          <strong className="cursor">
+            <Card.Meta title={p.title}></Card.Meta>
+          </strong>
+          <OptionalQuitButton onExit={p.onExit}></OptionalQuitButton>
+        </Flex>
         <Divider></Divider>
-        {children}
+        {p.children}
       </Card>
     </Draggable>
   );
