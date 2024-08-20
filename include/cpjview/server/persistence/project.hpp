@@ -3,6 +3,7 @@
 #include "cpjview/server/persistence/entity.hpp"
 #include "cpjview/server/persistence/kv.hpp"
 #include "cpjview/server/persistence/string_pool.hpp"
+#include <functional>
 #include <map>
 #include <memory>
 

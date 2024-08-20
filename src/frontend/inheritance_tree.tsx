@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Tree, TreeDataNode } from "antd";
-import CodeCard from "./code_card";
 
 type P = {
   project: string | null;
@@ -64,9 +63,9 @@ const InheritanceTree: React.FC<P> = (prop) => {
 
     const classes = createCppClasses(dependencies);
     let treeData: TreeDataNode[] = [];
-    for (let info of classes) {
-      if (info.isFirstBase) {
-        treeData.push(info.toTreeNode());
+    for (let cppClass of classes) {
+      if (cppClass.isFirstBase) {
+        treeData.push(cppClass.toTreeNode());
       }
     }
 

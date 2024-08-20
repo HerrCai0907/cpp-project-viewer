@@ -1,6 +1,7 @@
 #include "cpjview/server/persistence/project.hpp"
 #include "cpjview/server/persistence/entity.hpp"
 #include <cassert>
+#include <functional>
 #include <memory>
 
 namespace cpjview::persistence {
@@ -25,6 +26,13 @@ Symbol *Project::ensure_node(StringPool::StringIndex name, SymbolKind kind) {
 
 void Project::ensure_relationship(Symbol *source, Symbol *target,
                                   RelationshipKind kind) {
+  assert(source != target && "cannot create relationship with self");
+  for (Relationship const *const r : source->get_relationships(kind)) {
+    if (r->get_target() == target) {
+      return;
+    }
+  }
+
   Relationship *relationship = nullptr;
   switch (kind) {
   case RelationshipKind::Inheritance: {
