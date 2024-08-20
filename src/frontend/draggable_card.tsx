@@ -1,15 +1,15 @@
 import React from "react";
-import { Card, Divider, Flex } from "antd";
-import Draggable from "react-draggable";
+import { Card, ConfigProvider } from "antd";
 import { Button } from "antd";
+import { Rnd } from "react-rnd";
 
 const OptionalQuitButton: React.FC<{
   onExit?: () => void;
 }> = (p) => {
   if (p.onExit) {
     return (
-      <Button type="primary" danger size="small" onClick={p.onExit}>
-        x
+      <Button danger size="small" onClick={p.onExit}>
+        close
       </Button>
     );
   } else {
@@ -23,18 +23,27 @@ const DraggableCard: React.FC<{
   onExit?: () => void;
 }> = (p) => {
   return (
-    <Draggable handle="strong">
-      <Card hoverable={true} style={{ width: 300 }}>
-        <Flex justify="space-around" align="center">
-          <strong className="cursor">
-            <Card.Meta title={p.title}></Card.Meta>
-          </strong>
-          <OptionalQuitButton onExit={p.onExit}></OptionalQuitButton>
-        </Flex>
-        <Divider></Divider>
-        {p.children}
-      </Card>
-    </Draggable>
+    <Rnd dragHandleClassName="cursor">
+      <ConfigProvider
+        theme={{
+          components: {
+            Card: {
+              colorBgContainer: "#A6D9A9",
+            },
+          },
+        }}
+      >
+        <Card
+          hoverable={true}
+          classNames={{ header: "cursor" }}
+          title={<p>{p.title}</p>}
+          extra={<OptionalQuitButton onExit={p.onExit}></OptionalQuitButton>}
+          bordered={true}
+        >
+          {p.children}
+        </Card>
+      </ConfigProvider>
+    </Rnd>
   );
 };
 
