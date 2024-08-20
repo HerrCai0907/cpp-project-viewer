@@ -63,7 +63,7 @@ void Storage::add_inheritance(std::string const &project_name,
 }
 
 Result<std::vector<Storage::InheritancePair>, ErrorCode>
-Storage::get_all_inheritance(std::string const &project_name) const {
+Storage::get_inheritances(std::string const &project_name) const {
   StringPool::StringIndex project_name_index =
       m_impl->ensure_string_in_cache(project_name);
   using RT = Result<std::vector<Storage::InheritancePair>, ErrorCode>;
@@ -73,17 +73,14 @@ Storage::get_all_inheritance(std::string const &project_name) const {
     return RT::failed(ErrorCode::not_found());
   }
   std::vector<Storage::InheritancePair> ret{};
-  project->for_each_relationship([&ret](
-                                     const Relationship *relationship) -> void {
-    const Inheritance *inheritance = relationship->dyn_cast<Inheritance>();
-    if (inheritance == nullptr) {
-      return;
-    }
-    ret.push_back({
-        .derived = inheritance->get_source()->cast<ClassSymbol>()->get_name(),
-        .base = inheritance->get_target()->cast<ClassSymbol>()->get_name(),
-    });
-  });
+  project->for_each_typed_relationship<Inheritance>(
+      [&ret](const Inheritance *inheritance) -> void {
+        ret.push_back({
+            .derived =
+                inheritance->get_source()->cast<ClassSymbol>()->get_name(),
+            .base = inheritance->get_target()->cast<ClassSymbol>()->get_name(),
+        });
+      });
   return RT::success(std::move(ret));
 }
 
@@ -133,6 +130,52 @@ Storage::get_code(std::string const &project_name,
                                      ->cast<CodeSymbol>()
                                      ->get_code();
   return RT::success(code);
+}
+
+// ================================================================
+// ========================== Label ===============================
+// ================================================================
+
+Result<void, ErrorCode> Storage::put_label(std::string const &project_name,
+                                           std::string const &symbol,
+                                           protocol::LabelKind label) {
+  using RT = Result<void, ErrorCode>;
+  StringPool::StringIndex project_name_index =
+      m_impl->ensure_string_in_cache(project_name);
+  StringPool::StringIndex name_index = m_impl->ensure_string_in_cache(symbol);
+
+  SymbolKind kind;
+  switch (label) {
+  case protocol::LabelKind::Record:
+    kind = SymbolKind::ClassNode;
+    break;
+  default:
+    return RT::failed(ErrorCode::not_found());
+  }
+  m_impl->ensure_project(project_name_index).ensure_node(name_index, kind);
+  return RT::success();
+}
+
+// ================================================================
+// ========================== Class ===============================
+// ================================================================
+
+Result<std::vector<const char *>, ErrorCode>
+Storage::get_classes(std::string const &project_name) {
+  using RT = Result<std::vector<const char *>, ErrorCode>;
+  StringPool::StringIndex project_name_index =
+      m_impl->ensure_string_in_cache(project_name);
+
+  Project *project = m_impl->m_project_map.get(project_name_index);
+  if (project == nullptr) {
+    return RT::failed(ErrorCode::not_found());
+  }
+  std::vector<const char *> ret{};
+  project->for_each_typed_node<ClassSymbol>(
+      [&ret](const ClassSymbol *symbol) -> void {
+        ret.push_back(symbol->get_name());
+      });
+  return RT::success(ret);
 }
 
 } // namespace cpjview::persistence

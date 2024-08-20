@@ -1,6 +1,7 @@
 #include "cpjview/client/analysis/inheritance.hpp"
 #include "cpjview/client/loader/filter.hpp"
 #include "cpjview/client/sync/sync.hpp"
+#include "cpjview/protocol/label.hpp"
 #include "clang/Tooling/Tooling.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,8 +32,11 @@ struct TestSync : public sync::ISync {
   MOCK_METHOD(void, add_inheritance_relationship,
               (std::string const &derived, std::string const &base),
               (override));
-  MOCK_METHOD(void, add_code,
+  MOCK_METHOD(void, add_source_code_relationship,
               (std::string const &name, std::string const &code), (override));
+  MOCK_METHOD(void, mark_label,
+              (std::string const &symbol, protocol::LabelKind label),
+              (override));
 };
 
 struct TestParm {

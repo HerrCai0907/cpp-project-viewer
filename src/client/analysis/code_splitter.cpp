@@ -1,6 +1,7 @@
 #include "cpjview/client/analysis/code_splitter.hpp"
 #include "cpjview/client/analysis/context_controlled_visitor.hpp"
 #include "cpjview/client/analysis/naming.hpp"
+#include "cpjview/protocol/label.hpp"
 #include "spdlog/spdlog.h"
 
 namespace cpjview::analysis {
@@ -34,7 +35,8 @@ private:
     spdlog::trace("[code splitter] find c++ record {}, code:\n{}", name,
                   decl->getSourceRange().printToString(
                       get_context().m_ast_unit->getSourceManager()));
-    get_context().m_storage->add_code(name, code);
+    get_context().m_storage->add_source_code_relationship(name, code);
+    get_context().m_storage->mark_label(name, protocol::LabelKind::Record);
   }
 };
 

@@ -6,6 +6,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <type_traits>
 
 namespace cpjview::persistence {
 
@@ -18,16 +19,39 @@ public:
 
   void ensure_relationship(Symbol *source, Symbol *target,
                            RelationshipKind kind);
-
   void ensure_relationship(StringPool::StringIndex source,
                            SymbolKind source_kind,
                            StringPool::StringIndex target,
                            SymbolKind target_kind, RelationshipKind kind);
 
   Symbol *get_node(StringPool::StringIndex name);
+  void for_each_node(std::function<void(Symbol const *)> fn) const;
+  template <class T>
+    requires(std::is_base_of_v<Symbol, T>)
+  void for_each_typed_node(std::function<void(T const *)> fn) const {
+    for_each_node([&](Symbol const *symbol) {
+      const T *typed = symbol->dyn_cast<T>();
+      if (typed == nullptr) {
+        return;
+      }
+      fn(typed);
+    });
+  }
 
   void
   for_each_relationship(std::function<void(Relationship const *)> fn) const;
+
+  template <class T>
+    requires(std::is_base_of_v<Relationship, T>)
+  void for_each_typed_relationship(std::function<void(T const *)> fn) const {
+    for_each_relationship([&](Relationship const *relationship) {
+      const T *typed = relationship->dyn_cast<T>();
+      if (typed == nullptr) {
+        return;
+      }
+      fn(typed);
+    });
+  }
 };
 
 } // namespace cpjview::persistence

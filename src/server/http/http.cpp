@@ -2,6 +2,7 @@
 #include "cpjview/common/result.hpp"
 #include "cpjview/protocol/code.hpp"
 #include "cpjview/protocol/inheritance.hpp"
+#include "cpjview/protocol/label.hpp"
 #include "cpjview/server/persistence/error_code.hpp"
 #include "cpjview/server/persistence/storage.hpp"
 #include "nlohmann/json_fwd.hpp"
@@ -86,6 +87,8 @@ private:
     register_project();
     register_inheritance();
     register_code();
+    register_label();
+    register_class();
   }
 
   void register_project() {
@@ -103,7 +106,6 @@ private:
       response.set_content(content, "application/json");
     });
   }
-
   void register_inheritance() {
     constexpr const char *path_pattern =
         "/api/v1/projects/:project/inheritances";
@@ -122,7 +124,7 @@ private:
       std::string const &project = request.path_params.at("project");
       Result<std::vector<persistence::Storage::InheritancePair>,
              persistence::ErrorCode>
-          inheritances = m_storage.get_all_inheritance(project);
+          inheritances = m_storage.get_inheritances(project);
       if (inheritances.nok()) {
         response.status = static_cast<int>(inheritances.take_error().m_code);
         spdlog::warn("[http] error code {}", response.status);
@@ -143,19 +145,20 @@ private:
       response.set_content(content, "application/json");
     });
   }
-
   void register_code() {
     constexpr const char *patch_pattern =
         "/api/v1/projects/:project/source_codes";
+    constexpr const char *get_pattern =
+        "/api/v1/projects/:project/source_codes/:symbol_name";
+
     m_server.Patch(patch_pattern, [this](const httplib::Request &request,
                                          httplib::Response &response) {
       spdlog::trace("[http] recv {}", to_string(request));
       std::string const &project = request.path_params.at("project");
-      protocol::Code code = protocol::Code::from_json(request.body);
+      protocol::SourceCode code = protocol::SourceCode::from_json(request.body);
       m_storage.put_code(project, code.m_name, code.m_code);
     });
-    constexpr const char *get_pattern =
-        "/api/v1/projects/:project/source_codes/:symbol_name";
+
     m_server.Get(get_pattern, [this](const httplib::Request &request,
                                      httplib::Response &response) {
       spdlog::trace("[http] recv {}", to_string(request));
@@ -172,6 +175,45 @@ private:
           {"symbol_name", symbol_name},
           {"source_code", source_code.get()},
       };
+      const std::string content = content_json.dump();
+      spdlog::trace("[http] response {}", content);
+      response.set_content(content, "application/json");
+    });
+  }
+  void register_label() {
+    constexpr const char *path_pattern = "/api/v1/projects/:project/labels";
+    m_server.Patch(path_pattern, [this](const httplib::Request &request,
+                                        httplib::Response &response) {
+      spdlog::trace("[http] recv {}", to_string(request));
+      std::string const &project = request.path_params.at("project");
+      protocol::Label code = protocol::Label::from_json(request.body);
+      Result<void, persistence::ErrorCode> put_result =
+          m_storage.put_label(project, code.m_symbol, code.m_label);
+      if (put_result.nok()) {
+        response.status = static_cast<int>(put_result.take_error().m_code);
+        spdlog::warn("[http] error code {}", response.status);
+        return;
+      }
+    });
+  }
+  void register_class() {
+    constexpr const char *path_pattern = "/api/v1/projects/:project/classes";
+    m_server.Get(path_pattern, [this](const httplib::Request &request,
+                                      httplib::Response &response) {
+      spdlog::trace("[http] recv {}", to_string(request));
+      std::string const &project = request.path_params.at("project");
+
+      Result<std::vector<const char *>, persistence::ErrorCode> classes =
+          m_storage.get_classes(project);
+      if (classes.nok()) {
+        response.status = static_cast<int>(classes.take_error().m_code);
+        spdlog::warn("[http] error code {}", response.status);
+        return;
+      }
+      nlohmann::json content_json = nlohmann::json::array();
+      for (const char *class_name : classes.get()) {
+        content_json.push_back(class_name);
+      }
       const std::string content = content_json.dump();
       spdlog::trace("[http] response {}", content);
       response.set_content(content, "application/json");

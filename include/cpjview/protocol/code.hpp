@@ -4,11 +4,11 @@
 
 namespace cpjview::protocol {
 
-struct Code {
+struct SourceCode {
   std::string m_name;
   std::string m_code;
 
-  static Code from_json(std::string json_str);
+  static SourceCode from_json(std::string json_str);
   std::string to_json() const;
 };
 

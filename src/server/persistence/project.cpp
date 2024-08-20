@@ -73,6 +73,11 @@ Symbol *Project::get_node(StringPool::StringIndex name) {
   }
   return nullptr;
 }
+void Project::for_each_node(std::function<void(Symbol const *)> fn) const {
+  for (auto const &[_, symbol] : m_node_map) {
+    fn(symbol.get());
+  }
+}
 
 void Project::for_each_relationship(
     std::function<void(Relationship const *)> fn) const {

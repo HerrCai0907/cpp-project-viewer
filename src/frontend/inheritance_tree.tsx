@@ -30,7 +30,10 @@ class CppClass {
   }
 }
 
-function createCppClasses(dependencies: Record<string, string[]>) {
+function createCppClasses(
+  dependencies: Record<string, string[]>,
+  classes: string[]
+) {
   let classMapping = new Map<string, CppClass>();
   for (const base in dependencies) {
     let baseClass = classMapping.get(base) ?? new CppClass(base);
@@ -42,9 +45,14 @@ function createCppClasses(dependencies: Record<string, string[]>) {
       derivedClass.isFirstBase = false;
     }
   }
-  return Array.from(classMapping.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  for (const c of classes) {
+    if (!classMapping.has(c)) {
+      classMapping.set(c, new CppClass(c));
+    }
+  }
+  return Array.from(classMapping.values()).sort((a, b) => {
+    return a.name.localeCompare(b.name);
+  });
 }
 
 const InheritanceTree: React.FC<P> = (prop) => {
@@ -57,13 +65,24 @@ const InheritanceTree: React.FC<P> = (prop) => {
     if (prop.project == status.project) {
       return;
     }
-    const dependencies: Record<string, string[]> = await (
-      await fetch(`/api/v1/projects/${prop.project}/inheritances`)
-    ).json();
+    const getInheritances = async (): Promise<Record<string, string[]>> => {
+      return await (
+        await fetch(`/api/v1/projects/${prop.project}/inheritances`)
+      ).json();
+    };
+    const getClasses = async (): Promise<string[]> => {
+      return await (
+        await fetch(`/api/v1/projects/${prop.project}/classes`)
+      ).json();
+    };
+    const [dependencies, classes] = await Promise.all([
+      getInheritances(),
+      getClasses(),
+    ]);
 
-    const classes = createCppClasses(dependencies);
+    const cppClasses = createCppClasses(dependencies, classes);
     let treeData: TreeDataNode[] = [];
-    for (let cppClass of classes) {
+    for (let cppClass of cppClasses) {
       if (cppClass.isFirstBase) {
         treeData.push(cppClass.toTreeNode());
       }
