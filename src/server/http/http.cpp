@@ -128,13 +128,15 @@ private:
         spdlog::warn("[http] error code {}", response.status);
         return;
       }
-      nlohmann::json content_json = nlohmann::json::array();
+      nlohmann::json content_json = nlohmann::json::object();
       for (persistence::Storage::InheritancePair const &relationship :
            inheritances.get()) {
-        content_json.push_back(nlohmann::json{
-            {"base", relationship.base},
-            {"derived", relationship.derived},
-        });
+        if (content_json.contains(relationship.base)) {
+          content_json[relationship.base].push_back(relationship.derived);
+        } else {
+          content_json[relationship.base] =
+              nlohmann::json::array({relationship.derived});
+        }
       }
       const std::string content = content_json.dump();
       spdlog::trace("[http] response {}", content);

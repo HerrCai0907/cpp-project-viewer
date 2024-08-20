@@ -30,17 +30,17 @@ class CppClass {
   }
 }
 
-function createCppClasses(dependencies: { base: string; derived: string }[]) {
+function createCppClasses(dependencies: Record<string, string[]>) {
   let classMapping = new Map<string, CppClass>();
-  for (const { base, derived } of dependencies) {
+  for (const base in dependencies) {
     let baseClass = classMapping.get(base) ?? new CppClass(base);
     classMapping.set(base, baseClass);
-
-    let derivedClass = classMapping.get(derived) ?? new CppClass(derived);
-    classMapping.set(derived, derivedClass);
-
-    baseClass.derivedClasses.push(derivedClass);
-    derivedClass.isFirstBase = false;
+    for (const derived of dependencies[base]) {
+      let derivedClass = classMapping.get(derived) ?? new CppClass(derived);
+      classMapping.set(derived, derivedClass);
+      baseClass.derivedClasses.push(derivedClass);
+      derivedClass.isFirstBase = false;
+    }
   }
   return Array.from(classMapping.values()).sort((a, b) =>
     a.name.localeCompare(b.name)
@@ -57,7 +57,7 @@ const InheritanceTree: React.FC<P> = (prop) => {
     if (prop.project == status.project) {
       return;
     }
-    const dependencies: { base: string; derived: string }[] = await (
+    const dependencies: Record<string, string[]> = await (
       await fetch(`/api/v1/projects/${prop.project}/inheritances`)
     ).json();
 
