@@ -5,6 +5,7 @@
 #include "cpjview/server/persistence/project.hpp"
 #include "cpjview/server/persistence/string_pool.hpp"
 #include "spdlog/spdlog.h"
+#include <sqlite3.h>
 #include <string>
 
 namespace cpjview::persistence {

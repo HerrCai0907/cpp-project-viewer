@@ -1,10 +1,10 @@
+.vscode
 /build
-/example/build
 /debug
-/release
+/example/build
 /node_modules
-/third_party/llvm-release
+/release
 /src/www/index.css
 /src/www/index.js
-
-.vscode
+/third_party/llvm-release
+/third_party/sqlite3

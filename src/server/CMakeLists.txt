@@ -9,6 +9,7 @@ add_executable(cpjview_server
 target_link_libraries(cpjview_server
   PUBLIC
   cpjview_common
+  sqlite3
 )
 
 target_include_directories(cpjview_server
