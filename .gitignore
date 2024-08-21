@@ -6,5 +6,6 @@
 /release
 /src/www/index.css
 /src/www/index.js
+/sqlite3.db
 /third_party/llvm-release
 /third_party/sqlite3

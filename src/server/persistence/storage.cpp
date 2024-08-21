@@ -5,6 +5,7 @@
 #include "cpjview/server/persistence/project.hpp"
 #include "cpjview/server/persistence/string_pool.hpp"
 #include "spdlog/spdlog.h"
+#include "sqlite3.hpp"
 #include <sqlite3.h>
 #include <string>
 
@@ -22,7 +23,20 @@ struct StorageImpl {
   }
 };
 
-Storage::Storage() { m_impl = new StorageImpl(); }
+Storage::Storage() {
+  sqlite3::Sqlite3 db{};
+  db.connect();
+  db.exec(""
+          "CREATE TABLE COMPANY(\n"
+          "ID INT PRIMARY KEY     NOT NULL,\n"
+          "NAME           TEXT    NOT NULL,\n"
+          "AGE            INT     NOT NULL,\n"
+          "ADDRESS        CHAR(50),\n"
+          "SALARY         REAL\n"
+          ");");
+
+  m_impl = new StorageImpl();
+}
 
 Storage::~Storage() { delete m_impl; }
 
